@@ -1,0 +1,7 @@
+{
+  "name": "StudyForge",
+  "description": "AI-Powered Personal Study Operating System featuring smart syllabus, questions, tests, spaced repetition, flashcards, planner, mistake book, and 10 specialized AI bots.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

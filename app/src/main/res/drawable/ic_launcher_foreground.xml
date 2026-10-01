@@ -1,0 +1,49 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Center glowing aura circle -->
+    <path
+        android:fillColor="#2238BDF8"
+        android:pathData="M54,54m-30,0a30,30 0,1,1 60,0a30,30 0,1,1 -60,0" />
+
+    <!-- Open Book Base -->
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M54,64 L30,52 C26,50 24,52 24,56 L24,76 C24,78 26,80 28,81 L52,90 C53.3,90.5 54.7,90.5 56,90 L80,81 C82,80 84,78 84,76 L84,56 C84,52 82,50 78,52 L54,64 Z" />
+
+    <!-- Inner Pages Contrast -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,61 L32,50 C29,48.5 28,50 28,53 L28,71 C28,72.5 29.5,74 31,74.7 L53,82.5 C53.6,82.7 54.4,82.7 55,82.5 L77,74.7 C78.5,74 80,72.5 80,71 L80,53 C80,50 79,48.5 76,50 L54,61 Z" />
+
+    <!-- Book Spine Divider -->
+    <path
+        android:fillColor="#0F172A"
+        android:pathData="M53,60 L55,60 L55,84 L53,84 Z" />
+
+    <!-- Rising Forge Flame / Compass Spark above the book -->
+    <!-- Top Spark Star -->
+    <path
+        android:fillColor="#FBBF24"
+        android:pathData="M54,22 L57,32 L67,35 L57,38 L54,48 L51,38 L41,35 L51,32 Z" />
+
+    <!-- Neural Intellect Nodes and connection rays -->
+    <path
+        android:fillColor="#818CF8"
+        android:pathData="M38,32m-3,0a3,3 0,1,1 6,0a3,3 0,1,1 -6,0" />
+    <path
+        android:fillColor="#818CF8"
+        android:pathData="M70,32m-3,0a3,3 0,1,1 6,0a3,3 0,1,1 -6,0" />
+    <path
+        android:fillColor="#38BDF8"
+        android:pathData="M54,47m-2.5,0a2.5,2.5 0,1,1 5,0a2.5,2.5 0,1,1 -5,0" />
+
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M40,33 L51,35 M68,33 L57,35 M54,40 L54,45"
+        android:strokeWidth="1.5"
+        android:strokeColor="#818CF8" />
+</vector>
+
