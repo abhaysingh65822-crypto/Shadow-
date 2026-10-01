@@ -111,7 +111,13 @@ fun BookmarksScreen(viewModel: StudyForgeViewModel) {
                                     "QUESTION" -> viewModel.navigateTo(StudyForgeRoute.QuestionBank)
                                     "NOTE" -> viewModel.navigateTo(StudyForgeRoute.Notes)
                                     "FLASHCARD" -> viewModel.navigateTo(StudyForgeRoute.Flashcards)
-                                    "DOCUMENT" -> viewModel.navigateTo(StudyForgeRoute.DocumentReader)
+                                    "DOCUMENT" -> {
+                                        val doc = viewModel.documents.value.find { it.id == bookmark.itemId }
+                                        if (doc != null) {
+                                            viewModel.selectedDocument.value = doc
+                                        }
+                                        viewModel.navigateTo(StudyForgeRoute.DocumentReader)
+                                    }
                                     else -> viewModel.navigateTo(StudyForgeRoute.Dashboard)
                                 }
                             },

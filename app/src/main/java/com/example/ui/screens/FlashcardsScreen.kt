@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -25,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ai.AiBotType
+import com.example.data.DeckEntity
 import com.example.data.FlashcardEntity
 import com.example.ui.StudyForgeViewModel
 import com.example.ui.theme.*
@@ -34,18 +36,33 @@ import kotlinx.coroutines.launch
 fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
     val allCards by viewModel.flashcards.collectAsStateWithLifecycle()
     val dueCards by viewModel.dueFlashcards.collectAsStateWithLifecycle()
+    val decks by viewModel.decks.collectAsStateWithLifecycle()
     val cardIndex by viewModel.activeCardIndex.collectAsStateWithLifecycle()
     val isFlipped by viewModel.isCardFlipped.collectAsStateWithLifecycle()
 
+    var selectedDeckId by remember { mutableStateOf<Long?>(null) }
     var showAiGeneratorDialog by remember { mutableStateOf(false) }
     var showManualAddDialog by remember { mutableStateOf(false) }
+    var showAddDeckDialog by remember { mutableStateOf(false) }
+    var newDeckName by remember { mutableStateOf("") }
+    var newDeckDesc by remember { mutableStateOf("") }
+
+    var editingCard by remember { mutableStateOf<FlashcardEntity?>(null) }
+    var editFront by remember { mutableStateOf("") }
+    var editBack by remember { mutableStateOf("") }
+
     var manualFront by remember { mutableStateOf("") }
     var manualBack by remember { mutableStateOf("") }
     var generatorTopic by remember { mutableStateOf("") }
     var isAiGenerating by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
-    val currentCards = if (dueCards.isNotEmpty()) dueCards else allCards
+    val deckFilteredCards = remember(allCards, selectedDeckId) {
+        if (selectedDeckId == null) allCards
+        else allCards.filter { it.deckId == selectedDeckId }
+    }
+
+    val currentCards = if (selectedDeckId != null) deckFilteredCards else (if (dueCards.isNotEmpty()) dueCards else allCards)
     val activeCard = currentCards.getOrNull(cardIndex.coerceIn(0, (currentCards.size - 1).coerceAtLeast(0)))
 
     LazyColumn(
@@ -76,7 +93,7 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "${dueCards.size} Cards Due for Review Today",
+                                text = "${dueCards.size} Card(s) Due for Review Today",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = ForgeAmber,
                                 fontWeight = FontWeight.SemiBold
@@ -104,6 +121,50 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text("AI Generate", fontSize = 12.sp)
                             }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Decks Filter & Management Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Decks",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        TextButton(
+                            onClick = { showAddDeckDialog = true },
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Text("+ New Deck", fontSize = 11.sp)
+                        }
+                    }
+
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        item {
+                            FilterChip(
+                                selected = selectedDeckId == null,
+                                onClick = { selectedDeckId = null },
+                                label = { Text("All Decks (${allCards.size})") }
+                            )
+                        }
+                        items(decks) { deck ->
+                            val count = allCards.count { it.deckId == deck.id }
+                            FilterChip(
+                                selected = selectedDeckId == deck.id,
+                                onClick = { selectedDeckId = deck.id },
+                                label = { Text("${deck.name} ($count)") }
+                            )
                         }
                     }
                 }
@@ -164,7 +225,6 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                                 fontWeight = FontWeight.SemiBold,
                                 color = if (isFlipped) Color.White else MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.graphicsLayer {
-                                    // Invert text horizontally when rotated > 90 deg so it renders upright
                                     if (rotation > 90f) rotationY = 180f
                                 }
                             )
@@ -244,7 +304,11 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                     color = MaterialTheme.colorScheme.surfaceVariant
                 ) {
                     Box(modifier = Modifier.padding(32.dp), contentAlignment = Alignment.Center) {
-                        Text("All flashcard reviews completed for now!")
+                        Text(
+                            text = if (allCards.isEmpty()) "No flashcards in library. Tap '+ Card' to create one!" else "All flashcard reviews completed for now!",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
                 }
             }
@@ -253,14 +317,20 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
         // All Cards in Deck Listing
         item {
             Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "All Stored Cards (${allCards.size})",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Stored Cards (${deckFilteredCards.size})",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
 
-        items(allCards) { card ->
+        items(deckFilteredCards) { card ->
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -288,26 +358,45 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                         )
                     }
 
-                    IconButton(
-                        onClick = {
-                            coroutineScope.launch {
-                                viewModel.repository.deleteFlashcard(card.id)
-                            }
-                        },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DeleteOutline,
-                            contentDescription = "Delete Flashcard",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
-                        )
+                    Row {
+                        IconButton(
+                            onClick = {
+                                editingCard = card
+                                editFront = card.front
+                                editBack = card.back
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Edit Card",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = {
+                                coroutineScope.launch {
+                                    viewModel.repository.deleteFlashcard(card.id)
+                                }
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteOutline,
+                                contentDescription = "Delete Flashcard",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }
         }
     }
 
+    // Manual Add Dialog
     if (showManualAddDialog) {
         AlertDialog(
             onDismissRequest = { showManualAddDialog = false },
@@ -337,6 +426,7 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                             coroutineScope.launch {
                                 viewModel.repository.insertFlashcard(
                                     FlashcardEntity(
+                                        deckId = selectedDeckId ?: 1L,
                                         front = manualFront.trim(),
                                         back = manualBack.trim(),
                                         cardType = "STANDARD"
@@ -355,6 +445,94 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
             },
             dismissButton = {
                 TextButton(onClick = { showManualAddDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Edit Card Dialog
+    if (editingCard != null) {
+        AlertDialog(
+            onDismissRequest = { editingCard = null },
+            title = { Text("Edit Flashcard") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = editFront,
+                        onValueChange = { editFront = it },
+                        label = { Text("Front (Question)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = editBack,
+                        onValueChange = { editBack = it },
+                        label = { Text("Back (Answer)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        editingCard?.let { card ->
+                            viewModel.editFlashcard(card.copy(front = editFront.trim(), back = editBack.trim()))
+                        }
+                        editingCard = null
+                    },
+                    enabled = editFront.isNotBlank() && editBack.isNotBlank()
+                ) {
+                    Text("Update Card")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingCard = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Add Deck Dialog
+    if (showAddDeckDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddDeckDialog = false },
+            title = { Text("Create Deck") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = newDeckName,
+                        onValueChange = { newDeckName = it },
+                        label = { Text("Deck Name") },
+                        placeholder = { Text("e.g. Thermodynamics Formulas") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = newDeckDesc,
+                        onValueChange = { newDeckDesc = it },
+                        label = { Text("Description") },
+                        placeholder = { Text("e.g. High-yield exam recall cards") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newDeckName.isNotBlank()) {
+                            viewModel.createDeck(newDeckName, subjectId = 1L, description = newDeckDesc)
+                            showAddDeckDialog = false
+                            newDeckName = ""
+                            newDeckDesc = ""
+                        }
+                    },
+                    enabled = newDeckName.isNotBlank()
+                ) {
+                    Text("Create Deck")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddDeckDialog = false }) {
                     Text("Cancel")
                 }
             }
@@ -398,9 +576,9 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                                     botType = AiBotType.AI_FLASHCARD_GENERATOR,
                                     userPrompt = "Generate 2 atomic Q&A flashcards for topic: $topic"
                                 )
-                                // Insert newly created card into Room
                                 viewModel.repository.insertFlashcard(
                                     FlashcardEntity(
+                                        deckId = selectedDeckId ?: 1L,
                                         front = "What is the key principle of $topic?",
                                         back = res.text.take(200),
                                         cardType = "STANDARD"

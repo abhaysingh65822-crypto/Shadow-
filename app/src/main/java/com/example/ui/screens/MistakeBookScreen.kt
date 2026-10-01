@@ -32,6 +32,9 @@ import kotlinx.coroutines.launch
 fun MistakeBookScreen(viewModel: StudyForgeViewModel) {
     val allMistakes by viewModel.mistakes.collectAsStateWithLifecycle()
     var selectedCategoryFilter by remember { mutableStateOf("ALL") }
+    var editingMistake by remember { mutableStateOf<MistakeEntity?>(null) }
+    var editCategory by remember { mutableStateOf("CONCEPTUAL") }
+    var editExplanation by remember { mutableStateOf("") }
     val coroutineScope = rememberCoroutineScope()
 
     val filteredMistakes = remember(allMistakes, selectedCategoryFilter) {
@@ -119,7 +122,7 @@ fun MistakeBookScreen(viewModel: StudyForgeViewModel) {
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "No recorded mistakes in this category. Keep solving practice sets!",
+                        text = "No recorded mistakes in this category. Any incorrect answers in Practice or Tests will be automatically captured here.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -136,10 +139,24 @@ fun MistakeBookScreen(viewModel: StudyForgeViewModel) {
                 items(filteredMistakes) { mistake ->
                     MistakeCard(
                         mistake = mistake,
+                        onRetry = {
+                            viewModel.retryMistake(mistake)
+                        },
+                        onEdit = {
+                            editingMistake = mistake
+                            editCategory = mistake.category
+                            editExplanation = mistake.explanation
+                        },
+                        onDelete = {
+                            coroutineScope.launch {
+                                viewModel.repository.deleteMistake(mistake.id)
+                            }
+                        },
                         onResolve = {
                             coroutineScope.launch {
+                                val newStatus = if (mistake.reviewStatus == "RESOLVED") "NEEDS_PRACTICE" else "RESOLVED"
                                 viewModel.repository.updateMistake(
-                                    mistake.copy(reviewStatus = "RESOLVED")
+                                    mistake.copy(reviewStatus = newStatus)
                                 )
                             }
                         },
@@ -153,21 +170,80 @@ fun MistakeBookScreen(viewModel: StudyForgeViewModel) {
             }
         }
     }
+
+    if (editingMistake != null) {
+        AlertDialog(
+            onDismissRequest = { editingMistake = null },
+            title = { Text("Edit Mistake Log") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Select Error Category:", style = MaterialTheme.typography.labelMedium)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("CONCEPTUAL", "CALCULATION", "CARELESS", "MEMORY").forEach { cat ->
+                            FilterChip(
+                                selected = editCategory == cat,
+                                onClick = { editCategory = cat },
+                                label = { Text(cat, fontSize = 10.sp) }
+                            )
+                        }
+                    }
+                    OutlinedTextField(
+                        value = editExplanation,
+                        onValueChange = { editExplanation = it },
+                        label = { Text("Analysis & Revision Notes") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(120.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        editingMistake?.let { m ->
+                            viewModel.editMistake(
+                                m.copy(
+                                    category = editCategory,
+                                    explanation = editExplanation.trim()
+                                )
+                            )
+                        }
+                        editingMistake = null
+                    }
+                ) {
+                    Text("Save Analysis")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingMistake = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 }
 
 @Composable
 fun MistakeCard(
     mistake: MistakeEntity,
+    onRetry: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
     onResolve: () -> Unit,
     onAskAi: () -> Unit
 ) {
+    val isResolved = mistake.reviewStatus == "RESOLVED"
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("mistake_card_${mistake.id}"),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        border = androidx.compose.foundation.BorderStroke(1.dp, ForgeRose.copy(alpha = 0.3f))
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (isResolved) ForgeEmerald.copy(alpha = 0.4f) else ForgeRose.copy(alpha = 0.3f)
+        )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -177,22 +253,31 @@ fun MistakeCard(
             ) {
                 Surface(
                     shape = RoundedCornerShape(6.dp),
-                    color = ForgeRose.copy(alpha = 0.15f)
+                    color = if (isResolved) ForgeEmerald.copy(alpha = 0.15f) else ForgeRose.copy(alpha = 0.15f)
                 ) {
                     Text(
-                        text = "${mistake.category} ERROR",
-                        color = ForgeRose,
+                        text = if (isResolved) "RESOLVED" else "${mistake.category} ERROR",
+                        color = if (isResolved) ForgeEmerald else ForgeRose,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
 
-                Text(
-                    text = "${mistake.subjectName} • ${mistake.topicName}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "${mistake.subjectName} • ${mistake.topicName}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    IconButton(onClick = onEdit, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(16.dp))
+                    }
+                    IconButton(onClick = onDelete, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.DeleteOutline, contentDescription = "Delete", modifier = Modifier.size(16.dp))
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -240,27 +325,43 @@ fun MistakeCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Button(
+                    onClick = onRetry,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = ForgeIndigo),
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp)
+                ) {
+                    Icon(Icons.Default.Replay, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Retry", fontSize = 12.sp)
+                }
+
                 OutlinedButton(
                     onClick = onAskAi,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(8.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp)
                 ) {
                     Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text("AI Diagnosis", fontSize = 12.sp)
                 }
 
-                Button(
+                OutlinedButton(
                     onClick = onResolve,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = ForgeEmerald),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp)
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(
+                        imageVector = if (isResolved) Icons.Default.CheckCircle else Icons.Default.Check,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = if (isResolved) ForgeEmerald else MaterialTheme.colorScheme.onSurface
+                    )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Resolved", fontSize = 12.sp)
+                    Text(if (isResolved) "Resolved" else "Mark Done", fontSize = 11.sp)
                 }
             }
         }

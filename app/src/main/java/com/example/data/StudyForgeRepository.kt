@@ -353,11 +353,15 @@ class StudyForgeRepository(private val dao: StudyForgeDao) {
     // Documents CRUD
     // ==========================================
     suspend fun insertDocument(doc: StudyDocumentEntity): Long = dao.insertDocument(doc)
+    suspend fun deleteDocument(id: Long) = dao.deleteDocument(id)
 
     // ==========================================
-    // Flashcards CRUD
+    // Flashcards & Decks CRUD
     // ==========================================
+    suspend fun insertDeck(deck: DeckEntity): Long = dao.insertDeck(deck)
+    suspend fun deleteDeck(id: Long) = dao.deleteDeck(id)
     suspend fun insertFlashcard(flashcard: FlashcardEntity): Long = dao.insertFlashcard(flashcard)
+    suspend fun updateFlashcard(flashcard: FlashcardEntity) = dao.updateFlashcard(flashcard)
     suspend fun deleteFlashcard(id: Long) = dao.deleteFlashcard(id)
 
     // ==========================================

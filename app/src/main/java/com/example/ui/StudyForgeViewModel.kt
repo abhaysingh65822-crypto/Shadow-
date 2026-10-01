@@ -107,6 +107,7 @@ class StudyForgeViewModel(application: Application) : AndroidViewModel(applicati
     val mistakes = repository.allMistakes.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val flashcards = repository.allFlashcards.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val dueFlashcards = repository.getDueFlashcards().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val decks = repository.allDecks.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val plannerTasks = repository.allPlannerTasks.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val studySessions = repository.allStudySessions.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val tests = repository.allTests.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -801,6 +802,208 @@ class StudyForgeViewModel(application: Application) : AndroidViewModel(applicati
                     difficultyPreference = difficulty
                 )
             )
+        }
+    }
+
+    // ==========================================
+    // Bookmarks Management
+    // ==========================================
+    fun toggleBookmark(type: String, itemId: Long, title: String, subtitle: String = "", route: String = "") {
+        viewModelScope.launch {
+            val isBookmarked = bookmarks.value.any { it.itemType.equals(type, ignoreCase = true) && it.itemId == itemId }
+            repository.toggleBookmark(type, itemId, title, subtitle, route, isBookmarked)
+        }
+    }
+
+    // ==========================================
+    // Flashcard Decks & Editing
+    // ==========================================
+    fun createDeck(name: String, subjectId: Long, description: String = "") {
+        viewModelScope.launch {
+            repository.insertDeck(DeckEntity(name = name.trim(), subjectId = subjectId, description = description.trim()))
+        }
+    }
+
+    fun deleteDeck(deckId: Long) {
+        viewModelScope.launch {
+            repository.deleteDeck(deckId)
+        }
+    }
+
+    fun editFlashcard(flashcard: FlashcardEntity) {
+        viewModelScope.launch {
+            repository.updateFlashcard(flashcard)
+        }
+    }
+
+    // ==========================================
+    // Notes Editing
+    // ==========================================
+    fun editNote(note: NoteEntity) {
+        viewModelScope.launch {
+            repository.updateNote(note.copy(updatedAt = System.currentTimeMillis()))
+        }
+    }
+
+    // ==========================================
+    // Study Documents CRUD
+    // ==========================================
+    fun addDocument(title: String, summary: String, content: String, pageCount: Int = 1, fileType: String = "PDF") {
+        viewModelScope.launch {
+            repository.insertDocument(
+                StudyDocumentEntity(
+                    title = title.trim(),
+                    summary = summary.trim(),
+                    contentExtract = content.trim(),
+                    pageCount = pageCount.coerceAtLeast(1),
+                    fileType = fileType
+                )
+            )
+        }
+    }
+
+    fun deleteDocument(docId: Long) {
+        viewModelScope.launch {
+            repository.deleteDocument(docId)
+            if (selectedDocument.value?.id == docId) {
+                selectedDocument.value = null
+            }
+        }
+    }
+
+    // ==========================================
+    // Planner Tasks Editing & AI Plan Generator
+    // ==========================================
+    fun editPlannerTask(task: PlannerTaskEntity) {
+        viewModelScope.launch {
+            repository.updatePlannerTask(task)
+        }
+    }
+
+    fun generateAiStudyPlan(onDone: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val userTarget = userProfile.value?.examTargetName?.ifBlank { "General STEM Studies" } ?: "General STEM Studies"
+                val allSubs = subjects.value
+                val weak = weakTopics.value
+
+                val planTasks = mutableListOf<PlannerTaskEntity>()
+                val baseTime = System.currentTimeMillis()
+
+                if (weak.isNotEmpty()) {
+                    weak.take(2).forEachIndexed { idx, top ->
+                        planTasks.add(
+                            PlannerTaskEntity(
+                                title = "Reinforce Weak Concept: ${top.title}",
+                                taskType = "REVISION",
+                                subjectName = allSubs.firstOrNull()?.name ?: "Physics",
+                                chapterName = "High-Yield Focus",
+                                scheduledDate = baseTime + (idx * 86400000L),
+                                durationMinutes = 40,
+                                priority = "HIGH"
+                            )
+                        )
+                    }
+                }
+
+                allSubs.take(3).forEachIndexed { idx, sub ->
+                    planTasks.add(
+                        PlannerTaskEntity(
+                            title = "Practice & Concept Drill: ${sub.name}",
+                            taskType = "PRACTICE",
+                            subjectName = sub.name,
+                            chapterName = "Active Chapter",
+                            scheduledDate = baseTime + ((idx + 1) * 86400000L),
+                            durationMinutes = 45,
+                            priority = "MEDIUM"
+                        )
+                    )
+                }
+
+                planTasks.forEach { repository.insertPlannerTask(it) }
+                onDone(true, "AI scheduled ${planTasks.size} targeted study tasks aligned with $userTarget!")
+            } catch (e: Exception) {
+                onDone(false, e.localizedMessage ?: "Failed to generate study plan")
+            }
+        }
+    }
+
+    // ==========================================
+    // Mistake Editing & Retry
+    // ==========================================
+    fun editMistake(mistake: MistakeEntity) {
+        viewModelScope.launch {
+            repository.updateMistake(mistake)
+        }
+    }
+
+    fun retryMistake(mistake: MistakeEntity) {
+        val q = questions.value.find { it.id == mistake.questionId }
+        if (q != null) {
+            startTest(
+                test = TestEntity(
+                    id = 0,
+                    title = "Mistake Retry: ${mistake.subjectName}",
+                    testType = "PRACTICE",
+                    durationMinutes = 10,
+                    totalMarks = 4,
+                    totalQuestions = 1
+                ),
+                questionsToUse = listOf(q)
+            )
+        } else {
+            navigateTo(StudyForgeRoute.QuestionBank)
+        }
+    }
+
+    fun setPomodoroFocusDuration(minutes: Int) {
+        val seconds = minutes * 60
+        _pomodoroState.value = _pomodoroState.value.copy(
+            totalSeconds = seconds,
+            remainingSeconds = seconds,
+            pausedRemainingSeconds = seconds,
+            targetEndTimeMillis = null,
+            isRunning = false
+        )
+        pomodoroTimerJob?.cancel()
+    }
+
+    fun importDataFromJson(jsonString: String, onDone: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val root = org.json.JSONObject(jsonString)
+                var count = 0
+                if (root.has("notes")) {
+                    val notesArr = root.getJSONArray("notes")
+                    for (i in 0 until notesArr.length()) {
+                        val n = notesArr.getJSONObject(i)
+                        repository.insertNote(
+                            NoteEntity(
+                                title = n.optString("title", "Imported Note"),
+                                contentMarkdown = n.optString("content", ""),
+                                subjectName = n.optString("subject", "General")
+                            )
+                        )
+                        count++
+                    }
+                }
+                if (root.has("flashcards")) {
+                    val fcArr = root.getJSONArray("flashcards")
+                    for (i in 0 until fcArr.length()) {
+                        val fc = fcArr.getJSONObject(i)
+                        repository.insertFlashcard(
+                            FlashcardEntity(
+                                front = fc.optString("front", "Imported Q"),
+                                back = fc.optString("back", "Imported A")
+                            )
+                        )
+                        count++
+                    }
+                }
+                onDone(true, "Successfully imported $count study item(s) from JSON!")
+            } catch (e: Exception) {
+                onDone(false, "Import failed: ${e.localizedMessage}")
+            }
         }
     }
 }

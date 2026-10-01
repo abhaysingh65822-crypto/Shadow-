@@ -33,7 +33,10 @@ fun AnalyticsScreen(viewModel: StudyForgeViewModel) {
 
     val totalStudyMinutes = remember(sessions) { sessions.sumOf { it.durationMinutes } }
     val avgTestAccuracy = remember(attempts) {
-        if (attempts.isNotEmpty()) attempts.map { it.accuracy }.average().toInt() else 75
+        if (attempts.isNotEmpty()) attempts.map { it.accuracy }.average().toInt() else 0
+    }
+    val avgSessionLength = remember(sessions) {
+        if (sessions.isNotEmpty()) sessions.map { it.durationMinutes }.average().toInt() else 0
     }
 
     LazyColumn(
@@ -80,7 +83,7 @@ fun AnalyticsScreen(viewModel: StudyForgeViewModel) {
                 MetricTile(
                     modifier = Modifier.weight(1f),
                     label = "Average Accuracy",
-                    value = "$avgTestAccuracy%",
+                    value = if (attempts.isNotEmpty()) "$avgTestAccuracy%" else "No data yet",
                     accentColor = ForgeEmerald
                 )
             }
@@ -115,11 +118,28 @@ fun AnalyticsScreen(viewModel: StudyForgeViewModel) {
             )
         }
 
+        if (totalStudyMinutes == 0) {
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant
+                ) {
+                    Text(
+                        text = "No study sessions recorded yet. Start a focus session in Pomodoro or practice questions to populate telemetry.",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(16.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+
         items(subjects) { subject ->
             val subjectMins = remember(sessions, subject.name) {
                 sessions.filter { it.subjectName.equals(subject.name, ignoreCase = true) }.sumOf { it.durationMinutes }
             }
-            val progress = if (totalStudyMinutes > 0) (subjectMins.toFloat() / totalStudyMinutes) else 0.25f
+            val progress = if (totalStudyMinutes > 0) (subjectMins.toFloat() / totalStudyMinutes) else 0f
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -134,7 +154,7 @@ fun AnalyticsScreen(viewModel: StudyForgeViewModel) {
                     ) {
                         Text(text = subject.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
                         Text(
-                            text = "${subjectMins}m (${(progress * 100).toInt()}%)",
+                            text = if (totalStudyMinutes > 0) "${subjectMins}m (${(progress * 100).toInt()}%)" else "0m",
                             fontWeight = FontWeight.SemiBold,
                             color = Color(android.graphics.Color.parseColor(subject.colorHex))
                         )
@@ -172,8 +192,27 @@ fun AnalyticsScreen(viewModel: StudyForgeViewModel) {
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
+
+                    val streakText = if ((profile?.currentStreak ?: 0) > 0) {
+                        "• Momentum is strong with a ${profile?.currentStreak}-day active study streak."
+                    } else {
+                        "• Start a study session today to establish your daily study streak."
+                    }
+
+                    val mistakeText = if (mistakes.isNotEmpty()) {
+                        "• ${mistakes.size} mistake(s) logged in Mistake Book. Review them to convert weak spots into strengths."
+                    } else {
+                        "• Zero unresolved errors in Mistake Book. Maintain this standard in your practice tests."
+                    }
+
+                    val sessionText = if (avgSessionLength > 0) {
+                        "• Average session length of $avgSessionLength minutes across ${sessions.size} logged focus blocks."
+                    } else {
+                        "• Log your first focus session using the Pomodoro timer to measure cognitive endurance."
+                    }
+
                     Text(
-                        text = "• Momentum is strong with a ${profile?.currentStreak}-day active streak.\n• Physics Kinematics mastery stands at 82%, while Friction static threshold problems require reinforced practice.\n• Average session length of 48 minutes aligns with peak cognitive attention spans.",
+                        text = "$streakText\n$mistakeText\n$sessionText",
                         style = MaterialTheme.typography.bodySmall,
                         lineHeight = 20.sp
                     )

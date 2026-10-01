@@ -164,7 +164,13 @@ interface StudyForgeDao {
     fun getAllDecks(): Flow<List<DeckEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDeck(deck: DeckEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDecks(decks: List<DeckEntity>)
+
+    @Query("DELETE FROM decks WHERE id = :id")
+    suspend fun deleteDeck(id: Long)
 
     @Query("SELECT * FROM flashcards ORDER BY dueDate ASC")
     fun getAllFlashcards(): Flow<List<FlashcardEntity>>
@@ -235,6 +241,9 @@ interface StudyForgeDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDocuments(docs: List<StudyDocumentEntity>)
+
+    @Query("DELETE FROM study_documents WHERE id = :id")
+    suspend fun deleteDocument(id: Long)
 
     // Bookmarks
     @Query("SELECT * FROM bookmarks ORDER BY timestamp DESC")
