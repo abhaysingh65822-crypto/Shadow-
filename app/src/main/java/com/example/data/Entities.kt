@@ -228,14 +228,20 @@ data class NotificationItemEntity(
 @Entity(tableName = "user_profile")
 data class UserProfileEntity(
     @PrimaryKey val id: Long = 1,
-    val currentStreak: Int = 3,
-    val longestStreak: Int = 7,
-    val totalXp: Int = 850,
-    val level: Int = 4,
-    val dailyTargetMinutes: Int = 120,
-    val examTargetName: String = "Final Engineering Board",
-    val examTargetDaysRemaining: Int = 42,
-    val lastActiveDate: Long = System.currentTimeMillis()
+    val name: String = "Student",
+    val currentStreak: Int = 0,
+    val longestStreak: Int = 0,
+    val totalXp: Int = 0,
+    val level: Int = 1,
+    val dailyTargetMinutes: Int = 60,
+    val examTargetName: String = "",
+    val examTargetDaysRemaining: Int = 0,
+    val examDateMillis: Long? = null,
+    val gradeClass: String = "",
+    val studyGoals: String = "",
+    val preferredSubjects: String = "",
+    val difficultyPreference: String = "MEDIUM",
+    val lastActiveDate: Long = 0L
 )
 
 @Entity(tableName = "ai_conversations")

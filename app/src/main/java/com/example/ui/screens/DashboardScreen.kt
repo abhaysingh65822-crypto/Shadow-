@@ -151,7 +151,9 @@ fun DashboardScreen(viewModel: StudyForgeViewModel) {
 
                     // Target Exam Countdown Pill
                     Surface(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { viewModel.navigateTo(StudyForgeRoute.Profile) },
                         shape = RoundedCornerShape(12.dp),
                         color = ForgeCyan.copy(alpha = 0.12f)
                     ) {
@@ -171,13 +173,20 @@ fun DashboardScreen(viewModel: StudyForgeViewModel) {
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = profile?.examTargetName ?: "Upcoming Board Exam",
+                                    text = if (!profile?.examTargetName.isNullOrBlank()) profile!!.examTargetName else "Set Target Exam",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium
                                 )
                             }
                             Text(
-                                text = "${profile?.examTargetDaysRemaining ?: 30} Days Left",
+                                text = if (profile?.examDateMillis != null && profile!!.examDateMillis!! > System.currentTimeMillis()) {
+                                    val days = ((profile!!.examDateMillis!! - System.currentTimeMillis()) / (1000L * 60 * 60 * 24)).toInt()
+                                    "$days Days Left"
+                                } else if (!profile?.examTargetName.isNullOrBlank()) {
+                                    "Date Not Set"
+                                } else {
+                                    "Tap to Set"
+                                },
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = ForgeCyan
@@ -225,10 +234,15 @@ fun DashboardScreen(viewModel: StudyForgeViewModel) {
                     Spacer(modifier = Modifier.height(10.dp))
 
                     val weakCount = weakTopics.size
+                    val totalSessions = viewModel.studySessions.value.size
                     val recText = if (weakCount > 0) {
-                        "Your telemetry flags ${weakCount} weak areas (e.g. ${weakTopics.firstOrNull()?.title}). Prioritize a 25-minute practice block on Friction & Rolling before attempting tomorrow's diagnostic test."
+                        "Your performance telemetry highlights ${weakCount} weak concept(s), starting with \"${weakTopics.firstOrNull()?.title}\". Recommended action: Complete a 20-minute targeted focus session to strengthen foundation."
+                    } else if (dueCards.isNotEmpty()) {
+                        "You have ${dueCards.size} flashcards due for active recall today under spaced repetition. Review them to prevent memory decay."
+                    } else if (totalSessions == 0) {
+                        "Welcome to StudyForge! Complete a focus session or answer questions in the Question Bank to build your personalized study telemetry and adaptive AI recommendations."
                     } else {
-                        "All current chapters are in high mastery! Recommended to review your ${dueCards.size} due flashcards to retain formulas in long-term memory."
+                        "Syllabus on track! Recommended action: Generate a 10-question practice set or diagnostic mock exam to test retention under exam conditions."
                     }
 
                     Text(

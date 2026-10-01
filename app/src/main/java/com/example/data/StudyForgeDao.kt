@@ -15,10 +15,25 @@ interface StudyForgeDao {
     fun getAllSubjects(): Flow<List<SubjectEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertSubject(subject: SubjectEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSubjects(subjects: List<SubjectEntity>)
 
     @Update
     suspend fun updateSubject(subject: SubjectEntity)
+
+    @Query("DELETE FROM subjects WHERE id = :id")
+    suspend fun deleteSubject(id: Long)
+
+    @Query("DELETE FROM chapters WHERE subjectId = :subjectId")
+    suspend fun deleteChaptersBySubject(subjectId: Long)
+
+    @Query("DELETE FROM topics WHERE chapterId IN (SELECT id FROM chapters WHERE subjectId = :subjectId)")
+    suspend fun deleteTopicsBySubject(subjectId: Long)
+
+    @Query("DELETE FROM questions WHERE subjectId = :subjectId")
+    suspend fun deleteQuestionsBySubject(subjectId: Long)
 
     // Chapters
     @Query("SELECT * FROM chapters WHERE subjectId = :subjectId ORDER BY orderIndex ASC")
@@ -28,10 +43,19 @@ interface StudyForgeDao {
     fun getAllChapters(): Flow<List<ChapterEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertChapter(chapter: ChapterEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertChapters(chapters: List<ChapterEntity>)
 
     @Update
     suspend fun updateChapter(chapter: ChapterEntity)
+
+    @Query("DELETE FROM chapters WHERE id = :id")
+    suspend fun deleteChapter(id: Long)
+
+    @Query("DELETE FROM topics WHERE chapterId = :chapterId")
+    suspend fun deleteTopicsByChapter(chapterId: Long)
 
     @Query("UPDATE chapters SET timeSpentMinutes = timeSpentMinutes + :minutes WHERE id = :chapterId")
     suspend fun addChapterStudyTime(chapterId: Long, minutes: Int)
@@ -47,10 +71,16 @@ interface StudyForgeDao {
     fun getAllTopics(): Flow<List<TopicEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTopic(topic: TopicEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTopics(topics: List<TopicEntity>)
 
     @Update
     suspend fun updateTopic(topic: TopicEntity)
+
+    @Query("DELETE FROM topics WHERE id = :id")
+    suspend fun deleteTopic(id: Long)
 
     // Questions
     @Query("SELECT * FROM questions ORDER BY id ASC")
@@ -72,10 +102,16 @@ interface StudyForgeDao {
     suspend fun getQuestionById(id: Long): QuestionEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertQuestion(question: QuestionEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertQuestions(questions: List<QuestionEntity>)
 
     @Update
     suspend fun updateQuestion(question: QuestionEntity)
+
+    @Query("DELETE FROM questions WHERE id = :id")
+    suspend fun deleteQuestion(id: Long)
 
     // Question Attempts
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -93,6 +129,9 @@ interface StudyForgeDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTests(tests: List<TestEntity>)
+
+    @Query("DELETE FROM tests WHERE id = :id")
+    suspend fun deleteTest(id: Long)
 
     // Test Attempts
     @Query("SELECT * FROM test_attempts ORDER BY completedAt DESC")

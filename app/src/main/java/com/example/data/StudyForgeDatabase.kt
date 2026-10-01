@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
         AiMessageEntity::class,
         AiLogEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class StudyForgeDatabase : RoomDatabase() {
@@ -70,28 +70,28 @@ abstract class StudyForgeDatabase : RoomDatabase() {
                 }
             }
 
+            override fun onDestructiveMigration(db: SupportSQLiteDatabase) {
+                super.onDestructiveMigration(db)
+                INSTANCE?.let { database ->
+                    scope.launch(Dispatchers.IO) {
+                        populateInitialData(database.studyForgeDao())
+                    }
+                }
+            }
+
             suspend fun populateInitialData(dao: StudyForgeDao) {
                 dao.insertOrUpdateProfile(SeedData.defaultProfile)
                 dao.insertSubjects(SeedData.subjects)
                 dao.insertChapters(SeedData.chapters)
                 dao.insertTopics(SeedData.topics)
                 dao.insertQuestions(SeedData.questions)
-                dao.insertMistakes(SeedData.mistakes)
                 dao.insertDecks(SeedData.decks)
                 dao.insertFlashcards(SeedData.flashcards)
                 dao.insertPlannerTasks(SeedData.plannerTasks)
                 dao.insertNotes(SeedData.notes)
                 dao.insertDocuments(SeedData.documents)
-                for (notif in SeedData.notifications) {
-                    dao.insertNotification(notif)
-                }
                 dao.insertTests(SeedData.tests)
-                for (attempt in SeedData.testAttempts) {
-                    dao.insertTestAttempt(attempt)
-                }
-                for (session in SeedData.studySessions) {
-                    dao.insertStudySession(session)
-                }
+                // Note: Mistakes, test attempts, and study sessions start completely empty for a new user
             }
         }
     }

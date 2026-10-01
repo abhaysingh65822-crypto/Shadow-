@@ -4,61 +4,63 @@ object SeedData {
 
     val defaultProfile = UserProfileEntity(
         id = 1,
-        currentStreak = 4,
-        longestStreak = 9,
-        totalXp = 1240,
-        level = 5,
-        dailyTargetMinutes = 120,
-        examTargetName = "National STEM & Engineering Entrance",
-        examTargetDaysRemaining = 38,
-        lastActiveDate = System.currentTimeMillis()
+        name = "Student",
+        currentStreak = 0,
+        longestStreak = 0,
+        totalXp = 0,
+        level = 1,
+        dailyTargetMinutes = 60,
+        examTargetName = "",
+        examTargetDaysRemaining = 0,
+        examDateMillis = null,
+        lastActiveDate = 0L
     )
 
     val subjects = listOf(
-        SubjectEntity(id = 1, name = "Physics", code = "PHY-101", colorHex = "#38BDF8", iconName = "bolt", totalChapters = 5, completedChapters = 2),
-        SubjectEntity(id = 2, name = "Chemistry", code = "CHM-102", colorHex = "#10B981", iconName = "science", totalChapters = 4, completedChapters = 1),
-        SubjectEntity(id = 3, name = "Mathematics", code = "MTH-103", colorHex = "#818CF8", iconName = "functions", totalChapters = 6, completedChapters = 3),
-        SubjectEntity(id = 4, name = "Computer Science", code = "CSE-104", colorHex = "#F59E0B", iconName = "terminal", totalChapters = 4, completedChapters = 2)
+        SubjectEntity(id = 1, name = "Physics", code = "PHY-101", colorHex = "#38BDF8", iconName = "bolt", totalChapters = 5, completedChapters = 0),
+        SubjectEntity(id = 2, name = "Chemistry", code = "CHM-102", colorHex = "#10B981", iconName = "science", totalChapters = 4, completedChapters = 0),
+        SubjectEntity(id = 3, name = "Mathematics", code = "MTH-103", colorHex = "#818CF8", iconName = "functions", totalChapters = 6, completedChapters = 0),
+        SubjectEntity(id = 4, name = "Computer Science", code = "CSE-104", colorHex = "#F59E0B", iconName = "terminal", totalChapters = 4, completedChapters = 0)
     )
 
     val chapters = listOf(
         // Physics
-        ChapterEntity(id = 1, subjectId = 1, title = "Motion in 1D & Kinematics", orderIndex = 1, completionPercent = 85, masteryLevel = 82, confidenceScore = 80, timeSpentMinutes = 190),
-        ChapterEntity(id = 2, subjectId = 1, title = "Laws of Motion & Friction", orderIndex = 2, completionPercent = 90, masteryLevel = 78, confidenceScore = 75, timeSpentMinutes = 240),
-        ChapterEntity(id = 3, subjectId = 1, title = "Work, Energy & Power", orderIndex = 3, completionPercent = 60, masteryLevel = 58, confidenceScore = 60, timeSpentMinutes = 110),
-        ChapterEntity(id = 4, subjectId = 1, title = "Rotational Mechanics & Torque", orderIndex = 4, completionPercent = 35, masteryLevel = 32, confidenceScore = 40, timeSpentMinutes = 75),
-        ChapterEntity(id = 5, subjectId = 1, title = "Thermodynamics & Kinetic Theory", orderIndex = 5, completionPercent = 15, masteryLevel = 20, confidenceScore = 30, timeSpentMinutes = 40),
+        ChapterEntity(id = 1, subjectId = 1, title = "Motion in 1D & Kinematics", orderIndex = 1, completionPercent = 0, masteryLevel = 0, confidenceScore = 0, timeSpentMinutes = 0),
+        ChapterEntity(id = 2, subjectId = 1, title = "Laws of Motion & Friction", orderIndex = 2, completionPercent = 0, masteryLevel = 0, confidenceScore = 0, timeSpentMinutes = 0),
+        ChapterEntity(id = 3, subjectId = 1, title = "Work, Energy & Power", orderIndex = 3, completionPercent = 0, masteryLevel = 0, confidenceScore = 0, timeSpentMinutes = 0),
+        ChapterEntity(id = 4, subjectId = 1, title = "Rotational Mechanics & Torque", orderIndex = 4, completionPercent = 0, masteryLevel = 0, confidenceScore = 0, timeSpentMinutes = 0),
+        ChapterEntity(id = 5, subjectId = 1, title = "Thermodynamics & Kinetic Theory", orderIndex = 5, completionPercent = 0, masteryLevel = 0, confidenceScore = 0, timeSpentMinutes = 0),
 
         // Chemistry
-        ChapterEntity(id = 6, subjectId = 2, title = "Chemical Bonding & Molecular Structure", orderIndex = 1, completionPercent = 80, masteryLevel = 75, confidenceScore = 70, timeSpentMinutes = 160),
-        ChapterEntity(id = 7, subjectId = 2, title = "Chemical Equilibrium & Le Chatelier", orderIndex = 2, completionPercent = 45, masteryLevel = 42, confidenceScore = 45, timeSpentMinutes = 95),
-        ChapterEntity(id = 8, subjectId = 2, title = "Thermodynamics & Enthalpy", orderIndex = 3, completionPercent = 25, masteryLevel = 30, confidenceScore = 35, timeSpentMinutes = 50),
-        ChapterEntity(id = 9, subjectId = 2, title = "Organic Reaction Mechanisms", orderIndex = 4, completionPercent = 10, masteryLevel = 15, confidenceScore = 20, timeSpentMinutes = 30),
+        ChapterEntity(id = 6, subjectId = 2, title = "Chemical Bonding & Molecular Structure", orderIndex = 1, completionPercent = 0, masteryLevel = 0, confidenceScore = 0, timeSpentMinutes = 0),
+        ChapterEntity(id = 7, subjectId = 2, title = "Chemical Equilibrium & Le Chatelier", orderIndex = 2, completionPercent = 0, masteryLevel = 0, confidenceScore = 0, timeSpentMinutes = 0),
+        ChapterEntity(id = 8, subjectId = 2, title = "Thermodynamics & Enthalpy", orderIndex = 3, completionPercent = 0, masteryLevel = 0, confidenceScore = 0, timeSpentMinutes = 0),
+        ChapterEntity(id = 9, subjectId = 2, title = "Organic Reaction Mechanisms", orderIndex = 4, completionPercent = 0, masteryLevel = 0, confidenceScore = 0, timeSpentMinutes = 0),
 
         // Mathematics
-        ChapterEntity(id = 10, subjectId = 3, title = "Differential Calculus & Limits", orderIndex = 1, completionPercent = 95, masteryLevel = 90, confidenceScore = 88, timeSpentMinutes = 280),
-        ChapterEntity(id = 11, subjectId = 3, title = "Integral Calculus & Areas", orderIndex = 2, completionPercent = 70, masteryLevel = 65, confidenceScore = 65, timeSpentMinutes = 180),
-        ChapterEntity(id = 12, subjectId = 3, title = "Vectors & 3D Geometry", orderIndex = 3, completionPercent = 50, masteryLevel = 48, confidenceScore = 55, timeSpentMinutes = 120),
-        ChapterEntity(id = 13, subjectId = 3, title = "Matrices & Determinants", orderIndex = 4, completionPercent = 85, masteryLevel = 88, confidenceScore = 90, timeSpentMinutes = 150),
-        ChapterEntity(id = 14, subjectId = 3, title = "Probability & Bayes Theorem", orderIndex = 5, completionPercent = 40, masteryLevel = 38, confidenceScore = 40, timeSpentMinutes = 80),
-        ChapterEntity(id = 15, subjectId = 3, title = "Differential Equations", orderIndex = 6, completionPercent = 20, masteryLevel = 25, confidenceScore = 30, timeSpentMinutes = 45),
+        ChapterEntity(id = 10, subjectId = 3, title = "Differential Calculus & Limits", orderIndex = 1, completionPercent = 0, masteryLevel = 0, confidenceScore = 0, timeSpentMinutes = 0),
+        ChapterEntity(id = 11, subjectId = 3, title = "Integral Calculus & Areas", orderIndex = 2, completionPercent = 0, masteryLevel = 0, confidenceScore = 0, timeSpentMinutes = 0),
+        ChapterEntity(id = 12, subjectId = 3, title = "Vectors & 3D Geometry", orderIndex = 3, completionPercent = 0, masteryLevel = 0, confidenceScore = 0, timeSpentMinutes = 0),
+        ChapterEntity(id = 13, subjectId = 3, title = "Matrices & Determinants", orderIndex = 4, completionPercent = 0, masteryLevel = 0, confidenceScore = 0, timeSpentMinutes = 0),
+        ChapterEntity(id = 14, subjectId = 3, title = "Probability & Bayes Theorem", orderIndex = 5, completionPercent = 0, masteryLevel = 0, confidenceScore = 0, timeSpentMinutes = 0),
+        ChapterEntity(id = 15, subjectId = 3, title = "Differential Equations", orderIndex = 6, completionPercent = 0, masteryLevel = 0, confidenceScore = 0, timeSpentMinutes = 0),
 
         // CS
-        ChapterEntity(id = 16, subjectId = 4, title = "Data Structures & Arrays", orderIndex = 1, completionPercent = 90, masteryLevel = 88, confidenceScore = 90, timeSpentMinutes = 220),
-        ChapterEntity(id = 17, subjectId = 4, title = "Binary Trees & BST", orderIndex = 2, completionPercent = 65, masteryLevel = 60, confidenceScore = 65, timeSpentMinutes = 140),
-        ChapterEntity(id = 18, subjectId = 4, title = "Graph Theory & Traversal", orderIndex = 3, completionPercent = 30, masteryLevel = 35, confidenceScore = 35, timeSpentMinutes = 60),
-        ChapterEntity(id = 19, subjectId = 4, title = "Dynamic Programming & Memoization", orderIndex = 4, completionPercent = 15, masteryLevel = 18, confidenceScore = 20, timeSpentMinutes = 45)
+        ChapterEntity(id = 16, subjectId = 4, title = "Data Structures & Arrays", orderIndex = 1, completionPercent = 0, masteryLevel = 0, confidenceScore = 0, timeSpentMinutes = 0),
+        ChapterEntity(id = 17, subjectId = 4, title = "Binary Trees & BST", orderIndex = 2, completionPercent = 0, masteryLevel = 0, confidenceScore = 0, timeSpentMinutes = 0),
+        ChapterEntity(id = 18, subjectId = 4, title = "Graph Theory & Traversal", orderIndex = 3, completionPercent = 0, masteryLevel = 0, confidenceScore = 0, timeSpentMinutes = 0),
+        ChapterEntity(id = 19, subjectId = 4, title = "Dynamic Programming & Memoization", orderIndex = 4, completionPercent = 0, masteryLevel = 0, confidenceScore = 0, timeSpentMinutes = 0)
     )
 
     val topics = listOf(
-        TopicEntity(id = 1, chapterId = 1, title = "Equations of Motion under Constant Acceleration", subtopicsJson = "[\"Derivation of v=u+at\", \"Displacement in nth second\", \"v^2-u^2=2as\"]", isCompleted = true, masteryScore = 88, accuracyRate = 85, revisionStatus = "MASTERED", difficultyLevel = "EASY", isWeak = false),
-        TopicEntity(id = 2, chapterId = 1, title = "Relative Velocity & River Swimmer Problems", subtopicsJson = "[\"Frame of Reference\", \"Shortest Path vs Minimum Time\", \"Rain Man Problems\"]", isCompleted = true, masteryScore = 65, accuracyRate = 60, revisionStatus = "DUE", difficultyLevel = "HARD", isWeak = true),
-        TopicEntity(id = 3, chapterId = 2, title = "Newton's 2nd Law & Free Body Diagrams", subtopicsJson = "[\"Internal vs External Forces\", \"Pulley Block Systems\", \"Wedge Constraints\"]", isCompleted = true, masteryScore = 80, accuracyRate = 78, revisionStatus = "MASTERED", difficultyLevel = "MEDIUM", isWeak = false),
-        TopicEntity(id = 4, chapterId = 2, title = "Friction & Rolling Resistance", subtopicsJson = "[\"Static vs Kinetic Friction\", \"Angle of Repose\", \"Two Block Friction Problems\"]", isCompleted = false, masteryScore = 52, accuracyRate = 48, revisionStatus = "DUE", difficultyLevel = "HARD", isWeak = true),
-        TopicEntity(id = 5, chapterId = 4, title = "Moment of Inertia Theorems", subtopicsJson = "[\"Parallel Axis Theorem\", \"Perpendicular Axis Theorem\", \"Standard Body Integrations\"]", isCompleted = false, masteryScore = 35, accuracyRate = 30, revisionStatus = "DUE", difficultyLevel = "HARD", isWeak = true),
-        TopicEntity(id = 6, chapterId = 7, title = "Le Chatelier Principle & Pressure Shifts", subtopicsJson = "[\"Effect of Volume & Pressure\", \"Inert Gas Addition\", \"Temperature Dependence\"]", isCompleted = false, masteryScore = 45, accuracyRate = 42, revisionStatus = "DUE", difficultyLevel = "MEDIUM", isWeak = true),
-        TopicEntity(id = 7, chapterId = 10, title = "L'Hopital's Rule & Indeterminate Forms", subtopicsJson = "[\"0/0 and inf/inf forms\", \"1^inf conversion\", \"Standard Limits\"]", isCompleted = true, masteryScore = 92, accuracyRate = 95, revisionStatus = "MASTERED", difficultyLevel = "EASY", isWeak = false),
-        TopicEntity(id = 8, chapterId = 11, title = "Definite Integrals by Substitution & By Parts", subtopicsJson = "[\"King's Property\", \"Leibniz Integral Rule\", \"Periodic Integrals\"]", isCompleted = true, masteryScore = 68, accuracyRate = 65, revisionStatus = "DUE", difficultyLevel = "HARD", isWeak = false)
+        TopicEntity(id = 1, chapterId = 1, title = "Equations of Motion under Constant Acceleration", subtopicsJson = "[\"Derivation of v=u+at\", \"Displacement in nth second\", \"v^2-u^2=2as\"]", isCompleted = false, masteryScore = 0, accuracyRate = 0, revisionStatus = "PENDING", difficultyLevel = "EASY", isWeak = false),
+        TopicEntity(id = 2, chapterId = 1, title = "Relative Velocity & River Swimmer Problems", subtopicsJson = "[\"Frame of Reference\", \"Shortest Path vs Minimum Time\", \"Rain Man Problems\"]", isCompleted = false, masteryScore = 0, accuracyRate = 0, revisionStatus = "PENDING", difficultyLevel = "HARD", isWeak = false),
+        TopicEntity(id = 3, chapterId = 2, title = "Newton's 2nd Law & Free Body Diagrams", subtopicsJson = "[\"Internal vs External Forces\", \"Pulley Block Systems\", \"Wedge Constraints\"]", isCompleted = false, masteryScore = 0, accuracyRate = 0, revisionStatus = "PENDING", difficultyLevel = "MEDIUM", isWeak = false),
+        TopicEntity(id = 4, chapterId = 2, title = "Friction & Rolling Resistance", subtopicsJson = "[\"Static vs Kinetic Friction\", \"Angle of Repose\", \"Two Block Friction Problems\"]", isCompleted = false, masteryScore = 0, accuracyRate = 0, revisionStatus = "PENDING", difficultyLevel = "HARD", isWeak = false),
+        TopicEntity(id = 5, chapterId = 4, title = "Moment of Inertia Theorems", subtopicsJson = "[\"Parallel Axis Theorem\", \"Perpendicular Axis Theorem\", \"Standard Body Integrations\"]", isCompleted = false, masteryScore = 0, accuracyRate = 0, revisionStatus = "PENDING", difficultyLevel = "HARD", isWeak = false),
+        TopicEntity(id = 6, chapterId = 7, title = "Le Chatelier Principle & Pressure Shifts", subtopicsJson = "[\"Effect of Volume & Pressure\", \"Inert Gas Addition\", \"Temperature Dependence\"]", isCompleted = false, masteryScore = 0, accuracyRate = 0, revisionStatus = "PENDING", difficultyLevel = "MEDIUM", isWeak = false),
+        TopicEntity(id = 7, chapterId = 10, title = "L'Hopital's Rule & Indeterminate Forms", subtopicsJson = "[\"0/0 and inf/inf forms\", \"1^inf conversion\", \"Standard Limits\"]", isCompleted = false, masteryScore = 0, accuracyRate = 0, revisionStatus = "PENDING", difficultyLevel = "EASY", isWeak = false),
+        TopicEntity(id = 8, chapterId = 11, title = "Definite Integrals by Substitution & By Parts", subtopicsJson = "[\"King's Property\", \"Leibniz Integral Rule\", \"Periodic Integrals\"]", isCompleted = false, masteryScore = 0, accuracyRate = 0, revisionStatus = "PENDING", difficultyLevel = "HARD", isWeak = false)
     )
 
     val questions = listOf(
@@ -148,7 +150,7 @@ object SeedData {
         )
     )
 
-    val mistakes = listOf(
+    val demoMistakes = listOf(
         MistakeEntity(
             id = 1,
             questionId = 2,
@@ -401,7 +403,7 @@ object SeedData {
         )
     )
 
-    val testAttempts = listOf(
+    val demoTestAttempts = listOf(
         TestAttemptEntity(
             id = 1,
             testId = 1,
@@ -418,7 +420,7 @@ object SeedData {
         )
     )
 
-    val studySessions = listOf(
+    val demoStudySessions = listOf(
         StudySessionEntity(
             id = 1,
             subjectId = 1,
@@ -442,4 +444,38 @@ object SeedData {
             xpEarned = 90
         )
     )
+
+    suspend fun loadDemoData(dao: StudyForgeDao) {
+        dao.insertMistakes(demoMistakes)
+        for (attempt in demoTestAttempts) {
+            dao.insertTestAttempt(attempt)
+        }
+        for (session in demoStudySessions) {
+            dao.insertStudySession(session)
+        }
+        dao.insertOrUpdateProfile(
+            UserProfileEntity(
+                id = 1,
+                name = "Alex Rivera (Demo)",
+                currentStreak = 4,
+                longestStreak = 7,
+                totalXp = 850,
+                level = 3,
+                dailyTargetMinutes = 120,
+                examTargetName = "National STEM Entrance",
+                examTargetDaysRemaining = 45,
+                examDateMillis = System.currentTimeMillis() + (45L * 86400000L),
+                lastActiveDate = System.currentTimeMillis()
+            )
+        )
+    }
+
+    suspend fun resetProgress(dao: StudyForgeDao) {
+        dao.clearAttempts()
+        dao.clearTestAttempts()
+        dao.clearMistakes()
+        dao.clearStudySessions()
+        dao.clearNotifications()
+        dao.insertOrUpdateProfile(defaultProfile)
+    }
 }

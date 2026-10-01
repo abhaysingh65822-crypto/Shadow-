@@ -309,8 +309,38 @@ class StudyForgeRepository(private val dao: StudyForgeDao) {
     // ==========================================
     // Syllabus & Topics CRUD
     // ==========================================
+    suspend fun insertSubject(subject: SubjectEntity): Long = dao.insertSubject(subject)
+    suspend fun updateSubject(subject: SubjectEntity) = dao.updateSubject(subject)
+    suspend fun deleteSubject(subjectId: Long) {
+        dao.deleteTopicsBySubject(subjectId)
+        dao.deleteChaptersBySubject(subjectId)
+        dao.deleteQuestionsBySubject(subjectId)
+        dao.deleteSubject(subjectId)
+    }
+
+    suspend fun insertChapter(chapter: ChapterEntity): Long = dao.insertChapter(chapter)
     suspend fun updateChapter(chapter: ChapterEntity) = dao.updateChapter(chapter)
+    suspend fun deleteChapter(chapterId: Long) {
+        dao.deleteTopicsByChapter(chapterId)
+        dao.deleteChapter(chapterId)
+    }
+
+    suspend fun insertTopic(topic: TopicEntity): Long = dao.insertTopic(topic)
     suspend fun updateTopic(topic: TopicEntity) = dao.updateTopic(topic)
+    suspend fun deleteTopic(topicId: Long) = dao.deleteTopic(topicId)
+
+    // ==========================================
+    // Questions CRUD
+    // ==========================================
+    suspend fun insertQuestion(question: QuestionEntity): Long = dao.insertQuestion(question)
+    suspend fun updateQuestion(question: QuestionEntity) = dao.updateQuestion(question)
+    suspend fun deleteQuestion(questionId: Long) = dao.deleteQuestion(questionId)
+
+    // ==========================================
+    // Tests CRUD
+    // ==========================================
+    suspend fun insertTest(test: TestEntity): Long = dao.insertTest(test)
+    suspend fun deleteTest(testId: Long) = dao.deleteTest(testId)
 
     // ==========================================
     // Notes CRUD
@@ -420,19 +450,23 @@ class StudyForgeRepository(private val dao: StudyForgeDao) {
         dao.insertChapters(SeedData.chapters)
         dao.insertTopics(SeedData.topics)
         dao.insertQuestions(SeedData.questions)
-        dao.insertMistakes(SeedData.mistakes)
         dao.insertDecks(SeedData.decks)
         dao.insertFlashcards(SeedData.flashcards)
         dao.insertPlannerTasks(SeedData.plannerTasks)
         dao.insertNotes(SeedData.notes)
         dao.insertDocuments(SeedData.documents)
-        for (notif in SeedData.notifications) dao.insertNotification(notif)
         dao.insertTests(SeedData.tests)
-        for (attempt in SeedData.testAttempts) dao.insertTestAttempt(attempt)
-        for (session in SeedData.studySessions) dao.insertStudySession(session)
     }
 
-    // JSON Export
+    suspend fun loadDemoData() {
+        SeedData.loadDemoData(dao)
+    }
+
+    suspend fun resetProgress() {
+        SeedData.resetProgress(dao)
+    }
+
+    // JSON Export & Import
     suspend fun exportDataAsJson(): String {
         val root = JSONObject()
         root.put("version", 1)
@@ -441,11 +475,37 @@ class StudyForgeRepository(private val dao: StudyForgeDao) {
         val profile = dao.getUserProfileSync()
         if (profile != null) {
             val profObj = JSONObject()
+            profObj.put("name", profile.name)
             profObj.put("streak", profile.currentStreak)
             profObj.put("xp", profile.totalXp)
             profObj.put("level", profile.level)
+            profObj.put("examTargetName", profile.examTargetName)
+            profObj.put("examDateMillis", profile.examDateMillis ?: 0L)
             root.put("profile", profObj)
         }
         return root.toString(2)
+    }
+
+    suspend fun importDataFromJson(jsonStr: String): Boolean {
+        return try {
+            val root = JSONObject(jsonStr)
+            val profObj = root.optJSONObject("profile")
+            if (profObj != null) {
+                val current = dao.getUserProfileSync() ?: SeedData.defaultProfile
+                dao.insertOrUpdateProfile(
+                    current.copy(
+                        name = profObj.optString("name", current.name),
+                        totalXp = profObj.optInt("xp", current.totalXp),
+                        level = profObj.optInt("level", current.level),
+                        currentStreak = profObj.optInt("streak", current.currentStreak),
+                        examTargetName = profObj.optString("examTargetName", current.examTargetName),
+                        examDateMillis = if (profObj.has("examDateMillis")) profObj.getLong("examDateMillis") else null
+                    )
+                )
+            }
+            true
+        } catch (e: Exception) {
+            false
+        }
     }
 }

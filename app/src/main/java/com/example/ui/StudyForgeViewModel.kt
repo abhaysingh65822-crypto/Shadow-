@@ -69,10 +69,13 @@ data class PomodoroState(
     val isRunning: Boolean = false,
     val totalSeconds: Int = 25 * 60,
     val remainingSeconds: Int = 25 * 60,
+    val targetEndTimeMillis: Long? = null,
+    val pausedRemainingSeconds: Int = 25 * 60,
     val currentMode: String = "FOCUS", // FOCUS (25m), SHORT_BREAK (5m), LONG_BREAK (15m)
     val selectedSubjectId: Long = 1,
     val selectedSubjectName: String = "Physics",
-    val selectedChapterName: String = "Motion in 1D & Kinematics"
+    val selectedChapterName: String = "Motion in 1D & Kinematics",
+    val sessionNotes: String = ""
 )
 
 class StudyForgeViewModel(application: Application) : AndroidViewModel(application) {
@@ -289,7 +292,7 @@ class StudyForgeViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     // ==========================================
-    // Pomodoro Timer Operations
+    // Pomodoro Timer Operations (Monotonic Timestamp)
     // ==========================================
     fun setPomodoroMode(mode: String) {
         val seconds = when (mode) {
@@ -301,6 +304,8 @@ class StudyForgeViewModel(application: Application) : AndroidViewModel(applicati
             currentMode = mode,
             totalSeconds = seconds,
             remainingSeconds = seconds,
+            pausedRemainingSeconds = seconds,
+            targetEndTimeMillis = null,
             isRunning = false
         )
         pomodoroTimerJob?.cancel()
@@ -309,10 +314,28 @@ class StudyForgeViewModel(application: Application) : AndroidViewModel(applicati
     fun togglePomodoro() {
         val current = _pomodoroState.value
         if (current.isRunning) {
+            // Pause
             pomodoroTimerJob?.cancel()
-            _pomodoroState.value = current.copy(isRunning = false)
+            val rem = current.targetEndTimeMillis?.let {
+                val diff = ((it - System.currentTimeMillis()) / 1000).toInt()
+                diff.coerceAtLeast(0)
+            } ?: current.remainingSeconds
+
+            _pomodoroState.value = current.copy(
+                isRunning = false,
+                targetEndTimeMillis = null,
+                remainingSeconds = rem,
+                pausedRemainingSeconds = rem
+            )
         } else {
-            _pomodoroState.value = current.copy(isRunning = true)
+            // Start or Resume
+            val rem = if (current.remainingSeconds > 0) current.remainingSeconds else current.totalSeconds
+            val targetEnd = System.currentTimeMillis() + (rem * 1000L)
+            _pomodoroState.value = current.copy(
+                isRunning = true,
+                remainingSeconds = rem,
+                targetEndTimeMillis = targetEnd
+            )
             startPomodoroLoop()
         }
     }
@@ -322,20 +345,72 @@ class StudyForgeViewModel(application: Application) : AndroidViewModel(applicati
         val total = _pomodoroState.value.totalSeconds
         _pomodoroState.value = _pomodoroState.value.copy(
             remainingSeconds = total,
+            pausedRemainingSeconds = total,
+            targetEndTimeMillis = null,
             isRunning = false
         )
+    }
+
+    fun skipPomodoro() {
+        pomodoroTimerJob?.cancel()
+        val next = when (_pomodoroState.value.currentMode) {
+            "FOCUS" -> "SHORT_BREAK"
+            "SHORT_BREAK" -> "FOCUS"
+            else -> "FOCUS"
+        }
+        setPomodoroMode(next)
+    }
+
+    fun endPomodoroEarly() {
+        val current = _pomodoroState.value
+        val elapsedSec = current.totalSeconds - current.remainingSeconds
+        val elapsedMin = elapsedSec / 60
+        resetPomodoro()
+        if (elapsedMin >= 1) {
+            viewModelScope.launch {
+                repository.recordStudySession(
+                    subjectId = current.selectedSubjectId,
+                    chapterId = null,
+                    subjectName = current.selectedSubjectName,
+                    chapterName = current.selectedChapterName,
+                    durationMinutes = elapsedMin,
+                    sessionType = current.currentMode,
+                    notes = current.sessionNotes.ifBlank { "Study session on ${current.selectedSubjectName}" }
+                )
+            }
+        }
+    }
+
+    fun setPomodoroSubject(subjectId: Long, subjectName: String) {
+        _pomodoroState.value = _pomodoroState.value.copy(
+            selectedSubjectId = subjectId,
+            selectedSubjectName = subjectName
+        )
+    }
+
+    fun setPomodoroNotes(notes: String) {
+        _pomodoroState.value = _pomodoroState.value.copy(sessionNotes = notes)
     }
 
     private fun startPomodoroLoop() {
         pomodoroTimerJob?.cancel()
         pomodoroTimerJob = viewModelScope.launch {
-            while (_pomodoroState.value.isRunning && _pomodoroState.value.remainingSeconds > 0) {
-                delay(1000)
-                val newRemain = _pomodoroState.value.remainingSeconds - 1
-                _pomodoroState.value = _pomodoroState.value.copy(remainingSeconds = newRemain)
-                if (newRemain == 0) {
+            while (_pomodoroState.value.isRunning) {
+                delay(500)
+                val current = _pomodoroState.value
+                if (!current.isRunning || current.targetEndTimeMillis == null) break
+                val now = System.currentTimeMillis()
+                val diffSec = ((current.targetEndTimeMillis - now) / 1000).toInt()
+                if (diffSec <= 0) {
+                    _pomodoroState.value = current.copy(
+                        remainingSeconds = 0,
+                        isRunning = false,
+                        targetEndTimeMillis = null
+                    )
                     completePomodoroSession()
                     break
+                } else {
+                    _pomodoroState.value = current.copy(remainingSeconds = diffSec)
                 }
             }
         }
@@ -343,7 +418,7 @@ class StudyForgeViewModel(application: Application) : AndroidViewModel(applicati
 
     private fun completePomodoroSession() {
         val current = _pomodoroState.value
-        _pomodoroState.value = current.copy(isRunning = false)
+        _pomodoroState.value = current.copy(isRunning = false, remainingSeconds = 0)
         val minutes = current.totalSeconds / 60
         viewModelScope.launch {
             repository.recordStudySession(
@@ -353,7 +428,7 @@ class StudyForgeViewModel(application: Application) : AndroidViewModel(applicati
                 chapterName = current.selectedChapterName,
                 durationMinutes = minutes,
                 sessionType = current.currentMode,
-                notes = "Completed ${current.currentMode} focus block on ${current.selectedChapterName}"
+                notes = current.sessionNotes.ifBlank { "Completed ${current.currentMode} focus block on ${current.selectedSubjectName}" }
             )
         }
     }
@@ -485,9 +560,247 @@ class StudyForgeViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    fun loadDemoData() {
+        viewModelScope.launch {
+            repository.loadDemoData()
+        }
+    }
+
+    fun resetProgress() {
+        viewModelScope.launch {
+            repository.resetProgress()
+        }
+    }
+
     fun clearAllData() {
         viewModelScope.launch {
             repository.clearAllData()
+        }
+    }
+
+    // ==========================================
+    // Syllabus CRUD Operations
+    // ==========================================
+    fun addSubject(name: String, code: String, colorHex: String, iconName: String) {
+        viewModelScope.launch {
+            repository.insertSubject(
+                SubjectEntity(
+                    name = name.trim(),
+                    code = code.trim().ifBlank { "SUB-${System.currentTimeMillis() % 1000}" },
+                    colorHex = colorHex,
+                    iconName = iconName
+                )
+            )
+        }
+    }
+
+    fun editSubject(subject: SubjectEntity) {
+        viewModelScope.launch {
+            repository.updateSubject(subject)
+        }
+    }
+
+    fun deleteSubject(subjectId: Long) {
+        viewModelScope.launch {
+            repository.deleteSubject(subjectId)
+        }
+    }
+
+    fun addChapter(subjectId: Long, title: String) {
+        viewModelScope.launch {
+            val currentCount = chapters.value.count { it.subjectId == subjectId }
+            repository.insertChapter(
+                ChapterEntity(
+                    subjectId = subjectId,
+                    title = title.trim(),
+                    orderIndex = currentCount + 1,
+                    completionPercent = 0,
+                    masteryLevel = 0,
+                    confidenceScore = 0,
+                    timeSpentMinutes = 0
+                )
+            )
+        }
+    }
+
+    fun editChapter(chapter: ChapterEntity) {
+        viewModelScope.launch {
+            repository.updateChapter(chapter)
+        }
+    }
+
+    fun deleteChapter(chapterId: Long) {
+        viewModelScope.launch {
+            repository.deleteChapter(chapterId)
+        }
+    }
+
+    fun addTopic(chapterId: Long, title: String, difficulty: String = "MEDIUM") {
+        viewModelScope.launch {
+            repository.insertTopic(
+                TopicEntity(
+                    chapterId = chapterId,
+                    title = title.trim(),
+                    difficultyLevel = difficulty,
+                    isCompleted = false,
+                    masteryScore = 0,
+                    accuracyRate = 0,
+                    isWeak = false
+                )
+            )
+        }
+    }
+
+    fun editTopic(topic: TopicEntity) {
+        viewModelScope.launch {
+            repository.updateTopic(topic)
+        }
+    }
+
+    fun deleteTopic(topicId: Long) {
+        viewModelScope.launch {
+            repository.deleteTopic(topicId)
+        }
+    }
+
+    fun toggleTopicCompleted(topic: TopicEntity) {
+        viewModelScope.launch {
+            repository.updateTopic(topic.copy(isCompleted = !topic.isCompleted))
+        }
+    }
+
+    // AI Syllabus Builder
+    fun createSyllabusWithAi(subjectName: String, targetExam: String, onDone: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val subId = repository.insertSubject(
+                    SubjectEntity(
+                        name = subjectName.trim(),
+                        code = "GEN-${System.currentTimeMillis() % 1000}",
+                        colorHex = "#4F46E5",
+                        iconName = "menu_book"
+                    )
+                )
+                val (chaps, tops) = aiManager.generateStructuredSyllabus(subjectName, targetExam)
+                chaps.forEach { chap ->
+                    val chapId = repository.insertChapter(chap.copy(subjectId = subId))
+                    tops.take(3).forEach { top ->
+                        repository.insertTopic(top.copy(chapterId = chapId))
+                    }
+                }
+                onDone(true, "Generated ${chaps.size} chapters for $subjectName!")
+            } catch (e: Exception) {
+                onDone(false, e.localizedMessage ?: "Generation failed")
+            }
+        }
+    }
+
+    // ==========================================
+    // Question Bank CRUD & AI Question Generator
+    // ==========================================
+    fun generateQuestionsWithAi(
+        subjectId: Long,
+        chapterId: Long,
+        topicId: Long,
+        subject: String,
+        topic: String,
+        difficulty: String,
+        type: String,
+        count: Int,
+        onDone: (Boolean, String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val generated = aiManager.generateStructuredQuestions(
+                    subjectId = subjectId,
+                    chapterId = chapterId,
+                    topicId = topicId,
+                    subject = subject,
+                    topic = topic,
+                    difficulty = difficulty,
+                    questionType = type,
+                    count = count
+                )
+                generated.forEach { q ->
+                    repository.insertQuestion(q)
+                }
+                onDone(true, "Successfully generated and saved ${generated.size} questions!")
+            } catch (e: Exception) {
+                onDone(false, e.localizedMessage ?: "Failed to generate questions")
+            }
+        }
+    }
+
+    fun addCustomQuestion(question: QuestionEntity) {
+        viewModelScope.launch {
+            repository.insertQuestion(question)
+        }
+    }
+
+    fun deleteQuestion(questionId: Long) {
+        viewModelScope.launch {
+            repository.deleteQuestion(questionId)
+        }
+    }
+
+    // ==========================================
+    // Test Engine CRUD
+    // ==========================================
+    fun createCustomTest(
+        title: String,
+        subjectFilter: String,
+        testType: String,
+        durationMinutes: Int,
+        totalMarks: Int,
+        totalQuestions: Int
+    ) {
+        viewModelScope.launch {
+            repository.insertTest(
+                TestEntity(
+                    title = title.trim(),
+                    testType = testType,
+                    durationMinutes = durationMinutes,
+                    totalMarks = totalMarks,
+                    totalQuestions = totalQuestions,
+                    subjectFilter = subjectFilter
+                )
+            )
+        }
+    }
+
+    fun deleteTest(testId: Long) {
+        viewModelScope.launch {
+            repository.deleteTest(testId)
+        }
+    }
+
+    // ==========================================
+    // Profile & Settings
+    // ==========================================
+    fun updateUserProfile(
+        name: String,
+        targetExam: String,
+        examDateMillis: Long?,
+        targetMinutes: Int,
+        difficulty: String
+    ) {
+        viewModelScope.launch {
+            val current = userProfile.value ?: SeedData.defaultProfile
+            val daysRem = if (examDateMillis != null && examDateMillis > System.currentTimeMillis()) {
+                ((examDateMillis - System.currentTimeMillis()) / (1000L * 60 * 60 * 24)).toInt()
+            } else {
+                0
+            }
+            repository.updateProfile(
+                current.copy(
+                    name = name.trim().ifBlank { current.name },
+                    examTargetName = targetExam.trim(),
+                    examDateMillis = examDateMillis,
+                    examTargetDaysRemaining = daysRem,
+                    dailyTargetMinutes = targetMinutes.coerceIn(15, 600),
+                    difficultyPreference = difficulty
+                )
+            )
         }
     }
 }
