@@ -38,6 +38,9 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
     val isFlipped by viewModel.isCardFlipped.collectAsStateWithLifecycle()
 
     var showAiGeneratorDialog by remember { mutableStateOf(false) }
+    var showManualAddDialog by remember { mutableStateOf(false) }
+    var manualFront by remember { mutableStateOf("") }
+    var manualBack by remember { mutableStateOf("") }
     var generatorTopic by remember { mutableStateOf("") }
     var isAiGenerating by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -80,15 +83,27 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                             )
                         }
 
-                        Button(
-                            onClick = { showAiGeneratorDialog = true },
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = ForgeIndigo)
-                        ) {
-                            Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("AI Generate", fontSize = 12.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                onClick = { showManualAddDialog = true },
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("+ Card", fontSize = 12.sp)
+                            }
+
+                            Button(
+                                onClick = { showAiGeneratorDialog = true },
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = ForgeIndigo)
+                            ) {
+                                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("AI Generate", fontSize = 12.sp)
+                            }
                         }
                     }
                 }
@@ -252,21 +267,98 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                 border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = "Q: ${card.front}",
-                        fontWeight = FontWeight.SemiBold,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "A: ${card.back}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Q: ${card.front}",
+                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "A: ${card.back}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    IconButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                viewModel.repository.deleteFlashcard(card.id)
+                            }
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteOutline,
+                            contentDescription = "Delete Flashcard",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                 }
             }
         }
+    }
+
+    if (showManualAddDialog) {
+        AlertDialog(
+            onDismissRequest = { showManualAddDialog = false },
+            title = { Text("Create Flashcard") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = manualFront,
+                        onValueChange = { manualFront = it },
+                        label = { Text("Front (Prompt / Question / Formula)") },
+                        placeholder = { Text("e.g. Formula for kinetic energy") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = manualBack,
+                        onValueChange = { manualBack = it },
+                        label = { Text("Back (Answer / Derivation)") },
+                        placeholder = { Text("e.g. KE = 1/2 * m * v^2") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (manualFront.isNotBlank() && manualBack.isNotBlank()) {
+                            coroutineScope.launch {
+                                viewModel.repository.insertFlashcard(
+                                    FlashcardEntity(
+                                        front = manualFront.trim(),
+                                        back = manualBack.trim(),
+                                        cardType = "STANDARD"
+                                    )
+                                )
+                                showManualAddDialog = false
+                                manualFront = ""
+                                manualBack = ""
+                            }
+                        }
+                    },
+                    enabled = manualFront.isNotBlank() && manualBack.isNotBlank()
+                ) {
+                    Text("Save Card")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showManualAddDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     // AI Flashcard Generation Dialog

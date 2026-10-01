@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -125,12 +126,12 @@ fun PomodoroScreen(viewModel: StudyForgeViewModel) {
         // Timer Controls
         item {
             Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedIconButton(
                     onClick = { viewModel.resetPomodoro() },
-                    modifier = Modifier.size(52.dp),
+                    modifier = Modifier.size(48.dp),
                     shape = CircleShape
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = "Reset")
@@ -139,10 +140,10 @@ fun PomodoroScreen(viewModel: StudyForgeViewModel) {
                 Button(
                     onClick = { viewModel.togglePomodoro() },
                     modifier = Modifier
-                        .height(56.dp)
-                        .padding(horizontal = 12.dp)
+                        .height(52.dp)
+                        .padding(horizontal = 8.dp)
                         .testTag("pomodoro_toggle_btn"),
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (pomodoroState.isRunning) ForgeRose else ForgeIndigo
                     )
@@ -150,14 +151,35 @@ fun PomodoroScreen(viewModel: StudyForgeViewModel) {
                     Icon(
                         imageVector = if (pomodoroState.isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = null,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (pomodoroState.isRunning) "Pause Focus" else "Start Session",
+                        text = if (pomodoroState.isRunning) "Pause" else "Start",
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold
                     )
+                }
+
+                OutlinedIconButton(
+                    onClick = { viewModel.skipPomodoro() },
+                    modifier = Modifier.size(48.dp),
+                    shape = CircleShape
+                ) {
+                    Icon(Icons.Default.SkipNext, contentDescription = "Skip Mode")
+                }
+
+                if (pomodoroState.remainingSeconds < pomodoroState.totalSeconds) {
+                    IconButton(
+                        onClick = { viewModel.endPomodoroEarly() },
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CheckCircle,
+                            contentDescription = "Complete & Log Early",
+                            tint = ForgeEmerald
+                        )
+                    }
                 }
             }
         }
@@ -177,27 +199,26 @@ fun PomodoroScreen(viewModel: StudyForgeViewModel) {
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Row(
+                    LazyRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        subjects.forEach { subj ->
+                        items(subjects) { subj ->
                             val isSelected = pomodoroState.selectedSubjectName == subj.name
                             Surface(
                                 modifier = Modifier
-                                    .weight(1f)
                                     .clip(RoundedCornerShape(8.dp))
                                     .clickable {
-                                        // Tag subject
+                                        viewModel.setPomodoroSubject(subj.id, subj.name)
                                     },
                                 color = if (isSelected) ForgeIndigoLight.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant,
                                 border = if (isSelected) androidx.compose.foundation.BorderStroke(1.dp, ForgeIndigoLight) else null,
                                 shape = RoundedCornerShape(8.dp)
                             ) {
-                                Box(modifier = Modifier.padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+                                Box(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
                                     Text(
                                         text = subj.name,
-                                        fontSize = 11.sp,
+                                        fontSize = 12.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                     )
                                 }

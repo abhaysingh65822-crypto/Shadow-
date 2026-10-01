@@ -44,12 +44,28 @@ fun GlobalSearchModal(
     val allFlashcards by viewModel.flashcards.collectAsStateWithLifecycle()
     val allMistakes by viewModel.mistakes.collectAsStateWithLifecycle()
     val allChapters by viewModel.chapters.collectAsStateWithLifecycle()
+    val allSubjects by viewModel.subjects.collectAsStateWithLifecycle()
+    val allTests by viewModel.tests.collectAsStateWithLifecycle()
 
-    val searchResults = remember(query, allNotes, allQuestions, allFlashcards, allMistakes, allChapters) {
+    val searchResults = remember(query, allNotes, allQuestions, allFlashcards, allMistakes, allChapters, allSubjects, allTests) {
         val q = query.trim()
         if (q.length < 2) emptyList()
         else {
             val list = mutableListOf<SearchResult>()
+
+            // Search Subjects
+            allSubjects.filter { it.name.contains(q, ignoreCase = true) || it.code.contains(q, ignoreCase = true) }
+                .take(3)
+                .forEach {
+                    list.add(SearchResult("SUBJECT", it.name, "${it.code} • ${it.totalChapters} chapters", StudyForgeRoute.Syllabus))
+                }
+
+            // Search Tests
+            allTests.filter { it.title.contains(q, ignoreCase = true) || it.subjectFilter.contains(q, ignoreCase = true) }
+                .take(3)
+                .forEach {
+                    list.add(SearchResult("EXAM", it.title, "${it.totalQuestions} questions • ${it.durationMinutes}m", StudyForgeRoute.TestEngine))
+                }
 
             // Search Notes
             allNotes.filter { it.title.contains(q, ignoreCase = true) || it.contentMarkdown.contains(q, ignoreCase = true) }

@@ -33,20 +33,22 @@ fun QuestionBankScreen(viewModel: StudyForgeViewModel) {
     val allQuestions by viewModel.questions.collectAsStateWithLifecycle()
     val subjects by viewModel.subjects.collectAsStateWithLifecycle()
 
-    var selectedSubjectFilter by remember { mutableStateOf("ALL") }
+    var selectedSubjectId by remember { mutableStateOf<Long?>(null) }
     var selectedDifficultyFilter by remember { mutableStateOf("ALL") }
     var showPyqOnly by remember { mutableStateOf(false) }
 
-    val filteredQuestions = remember(allQuestions, selectedSubjectFilter, selectedDifficultyFilter, showPyqOnly) {
+    var showAiGenerateDialog by remember { mutableStateOf(false) }
+    var generateTopic by remember { mutableStateOf("") }
+    var generateDifficulty by remember { mutableStateOf("MEDIUM") }
+    var generateType by remember { mutableStateOf("MCQ") }
+    var isGenerating by remember { mutableStateOf(false) }
+    var generationStatus by remember { mutableStateOf<String?>(null) }
+
+    val coroutineScope = rememberCoroutineScope()
+
+    val filteredQuestions = remember(allQuestions, selectedSubjectId, selectedDifficultyFilter, showPyqOnly) {
         allQuestions.filter { q ->
-            val matchSubject = when (selectedSubjectFilter) {
-                "ALL" -> true
-                "PHYSICS" -> q.subjectId == 1L
-                "CHEMISTRY" -> q.subjectId == 2L
-                "MATH" -> q.subjectId == 3L
-                "CS" -> q.subjectId == 4L
-                else -> true
-            }
+            val matchSubject = selectedSubjectId == null || q.subjectId == selectedSubjectId
             val matchDiff = if (selectedDifficultyFilter == "ALL") true else q.difficulty.equals(selectedDifficultyFilter, ignoreCase = true)
             val matchPyq = if (showPyqOnly) q.isPyq else true
             matchSubject && matchDiff && matchPyq
@@ -68,30 +70,30 @@ fun QuestionBankScreen(viewModel: StudyForgeViewModel) {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 item {
                     FilterChip(
-                        selected = selectedSubjectFilter == "ALL",
-                        onClick = { selectedSubjectFilter = "ALL" },
+                        selected = selectedSubjectId == null,
+                        onClick = { selectedSubjectId = null },
                         label = { Text("All Subjects") }
                     )
                 }
-                item {
+                items(subjects) { subject ->
                     FilterChip(
-                        selected = selectedSubjectFilter == "PHYSICS",
-                        onClick = { selectedSubjectFilter = "PHYSICS" },
-                        label = { Text("Physics") }
+                        selected = selectedSubjectId == subject.id,
+                        onClick = { selectedSubjectId = if (selectedSubjectId == subject.id) null else subject.id },
+                        label = { Text(subject.name) }
                     )
                 }
                 item {
                     FilterChip(
-                        selected = selectedSubjectFilter == "CHEMISTRY",
-                        onClick = { selectedSubjectFilter = "CHEMISTRY" },
-                        label = { Text("Chemistry") }
-                    )
-                }
-                item {
-                    FilterChip(
-                        selected = selectedSubjectFilter == "MATH",
-                        onClick = { selectedSubjectFilter = "MATH" },
-                        label = { Text("Mathematics") }
+                        selected = selectedDifficultyFilter == "ALL",
+                        onClick = {
+                            selectedDifficultyFilter = when (selectedDifficultyFilter) {
+                                "ALL" -> "EASY"
+                                "EASY" -> "MEDIUM"
+                                "MEDIUM" -> "HARD"
+                                else -> "ALL"
+                            }
+                        },
+                        label = { Text("Diff: $selectedDifficultyFilter") }
                     )
                 }
                 item {
@@ -121,16 +123,29 @@ fun QuestionBankScreen(viewModel: StudyForgeViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Practice Repository",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "${filteredQuestions.size} Questions Available",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Column {
+                        Text(
+                            text = "Practice Repository",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "${filteredQuestions.size} Questions Available",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    Button(
+                        onClick = { showAiGenerateDialog = true },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ForgeIndigo),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("AI Generate", fontSize = 12.sp)
+                    }
                 }
             }
 
@@ -141,11 +156,118 @@ fun QuestionBankScreen(viewModel: StudyForgeViewModel) {
                         viewModel.attemptQuestionInBank(question, answer, onVerified)
                     },
                     onBookmark = {
-                        // toggle bookmark
+                        coroutineScope.launch {
+                            viewModel.repository.toggleBookmark(
+                                type = "QUESTION",
+                                id = question.id,
+                                title = question.questionText.take(60),
+                                subtitle = "${question.difficulty} • PYQ: ${question.isPyq}",
+                                route = "question_bank",
+                                isCurrentlyBookmarked = question.isBookmarked
+                            )
+                        }
                     }
                 )
             }
         }
+    }
+
+    if (showAiGenerateDialog) {
+        val targetSubject = subjects.firstOrNull { it.id == selectedSubjectId } ?: subjects.firstOrNull()
+        AlertDialog(
+            onDismissRequest = { if (!isGenerating) showAiGenerateDialog = false },
+            title = { Text("AI Question Generator") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "Generate structured test questions for ${targetSubject?.name ?: "your subjects"} with answer keys and full explanations.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    OutlinedTextField(
+                        value = generateTopic,
+                        onValueChange = { generateTopic = it },
+                        label = { Text("Topic or Concept") },
+                        placeholder = { Text("e.g. Projectile Motion or Stoichiometry") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("EASY", "MEDIUM", "HARD").forEach { diff ->
+                            FilterChip(
+                                selected = generateDifficulty == diff,
+                                onClick = { generateDifficulty = diff },
+                                label = { Text(diff, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("MCQ", "NUMERICAL", "TRUE_FALSE").forEach { t ->
+                            FilterChip(
+                                selected = generateType == t,
+                                onClick = { generateType = t },
+                                label = { Text(t, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+
+                    if (isGenerating) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                    if (generationStatus != null) {
+                        Text(
+                            text = generationStatus ?: "",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ForgeEmerald
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (targetSubject != null && generateTopic.isNotBlank()) {
+                            isGenerating = true
+                            generationStatus = "Generating questions..."
+                            viewModel.generateQuestionsWithAi(
+                                subjectId = targetSubject.id,
+                                chapterId = 1L,
+                                topicId = 1L,
+                                subject = targetSubject.name,
+                                topic = generateTopic.trim(),
+                                difficulty = generateDifficulty,
+                                type = generateType,
+                                count = 3
+                            ) { ok, msg ->
+                                isGenerating = false
+                                generationStatus = msg
+                                if (ok) {
+                                    showAiGenerateDialog = false
+                                    generateTopic = ""
+                                }
+                            }
+                        }
+                    },
+                    enabled = !isGenerating && generateTopic.isNotBlank()
+                ) {
+                    Text("Generate & Save")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showAiGenerateDialog = false },
+                    enabled = !isGenerating
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
@@ -156,10 +278,14 @@ fun QuestionPracticeCard(
     onBookmark: () -> Unit
 ) {
     var selectedOption by remember { mutableStateOf<String?>(null) }
+    var numericalInput by remember { mutableStateOf("") }
     var hasAnswered by remember { mutableStateOf(false) }
     var isCorrectAnswer by remember { mutableStateOf(false) }
     var showHint by remember { mutableStateOf(false) }
     var showExplanation by remember { mutableStateOf(false) }
+    var isBookmarked by remember { mutableStateOf(question.isBookmarked) }
+
+    val isNumerical = question.type.equals("NUMERICAL", ignoreCase = true) || question.optionsJson == "[]"
 
     val options = remember(question.optionsJson) {
         try {
@@ -170,7 +296,7 @@ fun QuestionPracticeCard(
             }
             list
         } catch (e: Exception) {
-            listOf("Option A", "Option B", "Option C", "Option D")
+            if (!isNumerical) listOf("Option A", "Option B", "Option C", "Option D") else emptyList()
         }
     }
 
@@ -183,13 +309,16 @@ fun QuestionPracticeCard(
         border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Badges
+            // Badges & Bookmark
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Surface(
                         shape = RoundedCornerShape(6.dp),
                         color = when (question.difficulty) {
@@ -225,13 +354,43 @@ fun QuestionPracticeCard(
                             )
                         }
                     }
+
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Text(
+                            text = question.type,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
                 }
 
-                Text(
-                    text = "+${question.marks} / -${question.negativeMarks}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "+${question.marks} / -${question.negativeMarks}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    IconButton(
+                        onClick = {
+                            isBookmarked = !isBookmarked
+                            onBookmark()
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isBookmarked) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                            contentDescription = "Bookmark",
+                            tint = if (isBookmarked) ForgeAmber else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -246,50 +405,67 @@ fun QuestionPracticeCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Options
-            options.forEach { option ->
-                val isSelected = selectedOption == option
-                val optionBorderColor = when {
-                    hasAnswered && option == question.correctAnswer -> ForgeEmerald
-                    hasAnswered && isSelected && !isCorrectAnswer -> ForgeRose
-                    isSelected -> ForgeIndigoLight
-                    else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                }
+            // Options or Numerical Input
+            if (isNumerical || options.isEmpty()) {
+                OutlinedTextField(
+                    value = if (hasAnswered) selectedOption ?: "" else numericalInput,
+                    onValueChange = {
+                        if (!hasAnswered) {
+                            numericalInput = it
+                            selectedOption = it
+                        }
+                    },
+                    label = { Text("Your Calculated Value / Answer") },
+                    placeholder = { Text("e.g. 9.8 or 42") },
+                    enabled = !hasAnswered,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                )
+            } else {
+                options.forEach { option ->
+                    val isSelected = selectedOption == option
+                    val optionBorderColor = when {
+                        hasAnswered && option == question.correctAnswer -> ForgeEmerald
+                        hasAnswered && isSelected && !isCorrectAnswer -> ForgeRose
+                        isSelected -> ForgeIndigoLight
+                        else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                    }
 
-                val optionBgColor = when {
-                    hasAnswered && option == question.correctAnswer -> ForgeEmerald.copy(alpha = 0.1f)
-                    hasAnswered && isSelected && !isCorrectAnswer -> ForgeRose.copy(alpha = 0.1f)
-                    isSelected -> ForgeIndigo.copy(alpha = 0.08f)
-                    else -> MaterialTheme.colorScheme.surface
-                }
+                    val optionBgColor = when {
+                        hasAnswered && option == question.correctAnswer -> ForgeEmerald.copy(alpha = 0.1f)
+                        hasAnswered && isSelected && !isCorrectAnswer -> ForgeRose.copy(alpha = 0.1f)
+                        isSelected -> ForgeIndigo.copy(alpha = 0.08f)
+                        else -> MaterialTheme.colorScheme.surface
+                    }
 
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .clickable(enabled = !hasAnswered) {
-                            selectedOption = option
-                        },
-                    shape = RoundedCornerShape(10.dp),
-                    color = optionBgColor,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, optionBorderColor)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable(enabled = !hasAnswered) {
+                                selectedOption = option
+                            },
+                        shape = RoundedCornerShape(10.dp),
+                        color = optionBgColor,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, optionBorderColor)
                     ) {
-                        RadioButton(
-                            selected = isSelected,
-                            onClick = { if (!hasAnswered) selectedOption = option },
-                            enabled = !hasAnswered
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = option,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-                        )
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = { if (!hasAnswered) selectedOption = option },
+                                enabled = !hasAnswered
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = option,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                            )
+                        }
                     }
                 }
             }

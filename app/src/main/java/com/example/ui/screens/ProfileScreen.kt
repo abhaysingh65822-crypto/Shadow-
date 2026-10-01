@@ -42,8 +42,11 @@ fun ProfileScreen(viewModel: StudyForgeViewModel) {
     val flashcards by viewModel.flashcards.collectAsStateWithLifecycle()
 
     var showEditGoalDialog by remember { mutableStateOf(false) }
+    var editStudentName by remember { mutableStateOf("") }
     var editExamName by remember { mutableStateOf("") }
     var editDaysRemaining by remember { mutableStateOf("") }
+    var editDailyMinutes by remember { mutableStateOf("") }
+    var editDifficulty by remember { mutableStateOf("MEDIUM") }
     val coroutineScope = rememberCoroutineScope()
 
     val totalMinutes = remember(sessions) { sessions.sumOf { it.durationMinutes } }
@@ -194,6 +197,7 @@ fun ProfileScreen(viewModel: StudyForgeViewModel) {
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val hasExam = !profile?.examTargetName.isNullOrBlank()
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Primary Exam Target",
@@ -202,23 +206,34 @@ fun ProfileScreen(viewModel: StudyForgeViewModel) {
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = profile?.examTargetName ?: "Engineering Board",
+                            text = if (hasExam) profile!!.examTargetName else "No Exam Target Set",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "${profile?.examTargetDaysRemaining ?: 30} Days Remaining until exam day",
+                            text = if (hasExam) {
+                                if (profile?.examTargetDaysRemaining != null && profile!!.examTargetDaysRemaining > 0) {
+                                    "${profile!!.examTargetDaysRemaining} Days Remaining until exam day"
+                                } else {
+                                    "Daily Target: ${profile?.dailyTargetMinutes ?: 60} mins"
+                                }
+                            } else {
+                                "Tap edit to configure your exam and study goals"
+                            },
                             style = MaterialTheme.typography.bodySmall,
-                            color = ForgeCyan,
+                            color = if (hasExam) ForgeCyan else MaterialTheme.colorScheme.onSurfaceVariant,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
 
                     IconButton(
                         onClick = {
+                            editStudentName = profile?.name ?: "Student"
                             editExamName = profile?.examTargetName ?: ""
-                            editDaysRemaining = "${profile?.examTargetDaysRemaining ?: 30}"
+                            editDaysRemaining = "${profile?.examTargetDaysRemaining ?: 0}"
+                            editDailyMinutes = "${profile?.dailyTargetMinutes ?: 60}"
+                            editDifficulty = profile?.difficultyPreference ?: "MEDIUM"
                             showEditGoalDialog = true
                         }
                     ) {
@@ -306,40 +321,77 @@ fun ProfileScreen(viewModel: StudyForgeViewModel) {
     if (showEditGoalDialog) {
         AlertDialog(
             onDismissRequest = { showEditGoalDialog = false },
-            title = { Text("Update Exam Target") },
+            title = { Text("Student Profile & Academic Goals") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(
-                        value = editExamName,
-                        onValueChange = { editExamName = it },
-                        label = { Text("Exam Name") },
+                        value = editStudentName,
+                        onValueChange = { editStudentName = it },
+                        label = { Text("Student Name") },
+                        placeholder = { Text("e.g. Alex Rivera") },
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
-                        value = editDaysRemaining,
-                        onValueChange = { editDaysRemaining = it },
-                        label = { Text("Days Remaining") },
+                        value = editExamName,
+                        onValueChange = { editExamName = it },
+                        label = { Text("Target Exam / Board") },
+                        placeholder = { Text("e.g. AP Physics, SAT, JEE, or Finals") },
                         modifier = Modifier.fillMaxWidth()
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = editDaysRemaining,
+                            onValueChange = { editDaysRemaining = it },
+                            label = { Text("Days Left") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = editDailyMinutes,
+                            onValueChange = { editDailyMinutes = it },
+                            label = { Text("Daily Target (m)") },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    Text("Preferred Difficulty:", style = MaterialTheme.typography.labelSmall)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf("EASY", "MEDIUM", "HARD").forEach { diff ->
+                            FilterChip(
+                                selected = editDifficulty == diff,
+                                onClick = { editDifficulty = diff },
+                                label = { Text(diff, fontSize = 11.sp) }
+                            )
+                        }
+                    }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
-                        val days = editDaysRemaining.toIntOrNull() ?: 30
+                        val days = editDaysRemaining.toIntOrNull() ?: 0
+                        val targetMins = editDailyMinutes.toIntOrNull() ?: 60
                         val currentProf = profile ?: UserProfileEntity()
                         coroutineScope.launch {
                             viewModel.repository.updateProfile(
                                 currentProf.copy(
+                                    name = editStudentName.trim().ifBlank { currentProf.name },
                                     examTargetName = editExamName.trim(),
-                                    examTargetDaysRemaining = days
+                                    examTargetDaysRemaining = days,
+                                    dailyTargetMinutes = targetMins.coerceIn(15, 600),
+                                    difficultyPreference = editDifficulty
                                 )
                             )
                             showEditGoalDialog = false
                         }
                     }
                 ) {
-                    Text("Save")
+                    Text("Save Goals")
                 }
             },
             dismissButton = {

@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -28,8 +29,15 @@ import com.example.ui.theme.*
 fun TestEngineScreen(viewModel: StudyForgeViewModel) {
     val tests by viewModel.tests.collectAsStateWithLifecycle()
     val attempts by viewModel.testAttempts.collectAsStateWithLifecycle()
+    val subjects by viewModel.subjects.collectAsStateWithLifecycle()
 
     var showCreateDialog by remember { mutableStateOf(false) }
+    var testTitle by remember { mutableStateOf("") }
+    var selectedSubject by remember { mutableStateOf("All") }
+    var testType by remember { mutableStateOf("MOCK_EXAM") }
+    var questionCount by remember { mutableStateOf("10") }
+    var durationMins by remember { mutableStateOf("30") }
+    var totalMarks by remember { mutableStateOf("40") }
 
     LazyColumn(
         modifier = Modifier
@@ -47,37 +55,46 @@ fun TestEngineScreen(viewModel: StudyForgeViewModel) {
                 border = androidx.compose.foundation.BorderStroke(1.dp, ForgeCyan.copy(alpha = 0.3f))
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "Exam Simulator & Diagnostics",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Timed mocks with negative marking & AI analysis",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Column {
-                            Text(
-                                text = "Exam Simulator & Diagnostics",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = "Timed mocks with negative marking & AI analysis",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
                         Button(
                             onClick = {
                                 tests.firstOrNull()?.let { test ->
                                     viewModel.startTest(test)
                                 }
                             },
+                            modifier = Modifier.weight(1f).testTag("quick_start_test_btn"),
                             shape = RoundedCornerShape(10.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = ForgeIndigo),
-                            modifier = Modifier.testTag("quick_start_test_btn")
+                            colors = ButtonDefaults.buttonColors(containerColor = ForgeIndigo)
                         ) {
                             Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Quick Mock")
+                        }
+
+                        OutlinedButton(
+                            onClick = { showCreateDialog = true },
+                            modifier = Modifier.weight(1f).testTag("create_custom_test_btn"),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Create Test")
                         }
                     }
                 }
@@ -87,7 +104,7 @@ fun TestEngineScreen(viewModel: StudyForgeViewModel) {
         // Available Test Templates
         item {
             Text(
-                text = "Available Test Suites",
+                text = "Available Test Suites (${tests.size})",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -110,17 +127,33 @@ fun TestEngineScreen(viewModel: StudyForgeViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = ForgeCyan.copy(alpha = 0.15f)
-                        ) {
-                            Text(
-                                text = test.testType.replace("_", " "),
-                                color = ForgeCyan,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = ForgeCyan.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    text = test.testType.replace("_", " "),
+                                    color = ForgeCyan,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                            if (test.subjectFilter.isNotBlank() && test.subjectFilter != "All") {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant
+                                ) {
+                                    Text(
+                                        text = test.subjectFilter,
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
                         }
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
@@ -136,12 +169,26 @@ fun TestEngineScreen(viewModel: StudyForgeViewModel) {
                         )
                     }
 
-                    Button(
-                        onClick = { viewModel.startTest(test) },
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
-                    ) {
-                        Text("Start Test", fontSize = 12.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = { viewModel.deleteTest(test.id) },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteOutline,
+                                contentDescription = "Delete Test",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Button(
+                            onClick = { viewModel.startTest(test) },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
+                            Text("Start", fontSize = 12.sp)
+                        }
                     }
                 }
             }
@@ -248,5 +295,93 @@ fun TestEngineScreen(viewModel: StudyForgeViewModel) {
                 }
             }
         }
+    }
+
+    if (showCreateDialog) {
+        AlertDialog(
+            onDismissRequest = { showCreateDialog = false },
+            title = { Text("Create Examination / Test") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = testTitle,
+                        onValueChange = { testTitle = it },
+                        label = { Text("Test Title") },
+                        placeholder = { Text("e.g. Midterm Mechanics Mock") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Text("Target Subject:", style = MaterialTheme.typography.labelSmall)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        item {
+                            FilterChip(
+                                selected = selectedSubject == "All",
+                                onClick = { selectedSubject = "All" },
+                                label = { Text("All Subjects", fontSize = 11.sp) }
+                            )
+                        }
+                        items(subjects) { subj ->
+                            FilterChip(
+                                selected = selectedSubject == subj.name,
+                                onClick = { selectedSubject = subj.name },
+                                label = { Text(subj.name, fontSize = 11.sp) }
+                            )
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = questionCount,
+                            onValueChange = { questionCount = it },
+                            label = { Text("Questions") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = durationMins,
+                            onValueChange = { durationMins = it },
+                            label = { Text("Duration (m)") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = totalMarks,
+                            onValueChange = { totalMarks = it },
+                            label = { Text("Marks") },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val title = testTitle.trim().ifBlank { "$selectedSubject Diagnostic Assessment" }
+                        val qCount = questionCount.toIntOrNull() ?: 10
+                        val dur = durationMins.toIntOrNull() ?: 30
+                        val marks = totalMarks.toIntOrNull() ?: (qCount * 4)
+
+                        viewModel.createCustomTest(
+                            title = title,
+                            subjectFilter = selectedSubject,
+                            testType = testType,
+                            durationMinutes = dur,
+                            totalMarks = marks,
+                            totalQuestions = qCount
+                        )
+                        showCreateDialog = false
+                        testTitle = ""
+                    }
+                ) {
+                    Text("Save & Ready")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreateDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }

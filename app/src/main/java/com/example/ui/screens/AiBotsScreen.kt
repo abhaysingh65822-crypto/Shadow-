@@ -113,7 +113,7 @@ fun AiBotsScreen(viewModel: StudyForgeViewModel) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -121,19 +121,39 @@ fun AiBotsScreen(viewModel: StudyForgeViewModel) {
                     text = "${selectedBot.title} • ${selectedBot.shortDesc}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f)
                 )
-                Surface(
-                    shape = RoundedCornerShape(4.dp),
-                    color = ForgeIndigoLight.copy(alpha = 0.15f)
-                ) {
-                    Text(
-                        text = viewModel.aiManager.getSelectedModel(),
-                        color = ForgeIndigoLight,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                    )
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = RoundedCornerShape(4.dp),
+                        color = ForgeIndigoLight.copy(alpha = 0.15f)
+                    ) {
+                        Text(
+                            text = viewModel.aiManager.getSelectedModel(),
+                            color = ForgeIndigoLight,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    IconButton(
+                        onClick = {
+                            viewModel.aiChatMessages.value = listOf(
+                                "BOT" to "Cleared chat history. I am ready to guide you through your next topic or problem."
+                            )
+                        },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteSweep,
+                            contentDescription = "Clear Chat",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
         }
@@ -205,29 +225,59 @@ fun AiBotsScreen(viewModel: StudyForgeViewModel) {
             }
         }
 
-        // Quick Suggestion Chips
-        LazyRow(
+        // Quick Pedagogical & Suggestion Chips
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                .padding(vertical = 4.dp)
         ) {
-            val suggestions = when (selectedBot) {
-                AiBotType.AI_PHYSICS_TUTOR -> listOf("Explain Friction vs Applied Force", "Moment of inertia of sphere", "Work energy theorem proof")
-                AiBotType.AI_CHEMISTRY_TUTOR -> listOf("Le Chatelier equilibrium shifts", "Inert gas effect at constant V", "Exothermic reaction temperature rule")
-                AiBotType.AI_MATHEMATICS_SOLVER -> listOf("Evaluate limit of (sin(3x)-3x)/x^3", "Leibniz rule differentiation", "Integration by parts trick")
-                AiBotType.AI_CODING_TUTOR -> listOf("Time complexity of BST search", "Array lookup vs Hash map", "Two pointer technique")
-                AiBotType.AI_PLANNER -> listOf("Plan my 2-hour study routine", "Reschedule missed tasks", "Prep for upcoming exam")
-                else -> listOf("Explain my weak topics", "Test me on Kinematics", "Create revision sheet")
-            }
-            items(suggestions) { sugg ->
-                SuggestionChip(
-                    onClick = {
-                        viewModel.aiChatInput.value = sugg
-                        viewModel.sendAiChatMessage()
-                    },
-                    label = { Text(sugg, fontSize = 11.sp) }
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                val cognitiveModes = listOf(
+                    "💡 Simplify" to "Simplify the explanation and explain like I'm a beginner: ",
+                    "🔬 Analogy" to "Give me an intuitive real-world analogy for: ",
+                    "📝 Step-by-Step" to "Solve this step-by-step with formulas and derivations: ",
+                    "🎯 Quiz Me" to "Ask me a conceptual multiple-choice question on: ",
+                    "🔍 Find Mistake" to "Here is my reasoning/solution, please diagnose my misconception: "
                 )
+                items(cognitiveModes) { (label, prefix) ->
+                    SuggestionChip(
+                        onClick = {
+                            val currentInput = viewModel.aiChatInput.value
+                            viewModel.aiChatInput.value = if (currentInput.isNotBlank()) "$prefix$currentInput" else prefix
+                        },
+                        label = { Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
+                    )
+                }
+            }
+
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                val suggestions = when (selectedBot) {
+                    AiBotType.AI_PHYSICS_TUTOR -> listOf("Friction vs Applied Force", "Moment of inertia of sphere", "Work energy theorem proof")
+                    AiBotType.AI_CHEMISTRY_TUTOR -> listOf("Le Chatelier equilibrium shifts", "Inert gas effect at constant V", "Exothermic reaction temperature rule")
+                    AiBotType.AI_MATHEMATICS_SOLVER -> listOf("Evaluate limit of (sin(3x)-3x)/x^3", "Leibniz rule differentiation", "Integration by parts trick")
+                    AiBotType.AI_CODING_TUTOR -> listOf("Time complexity of BST search", "Array lookup vs Hash map", "Two pointer technique")
+                    AiBotType.AI_PLANNER -> listOf("Plan my 2-hour study routine", "Reschedule missed tasks", "Prep for upcoming exam")
+                    else -> listOf("Explain my weak topics", "Test me on Kinematics", "Create revision sheet")
+                }
+                items(suggestions) { sugg ->
+                    SuggestionChip(
+                        onClick = {
+                            viewModel.aiChatInput.value = sugg
+                            viewModel.sendAiChatMessage()
+                        },
+                        label = { Text(sugg, fontSize = 11.sp) }
+                    )
+                }
             }
         }
 

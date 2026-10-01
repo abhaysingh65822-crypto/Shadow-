@@ -322,6 +322,18 @@ fun SettingsScreen(viewModel: StudyForgeViewModel) {
                     Spacer(modifier = Modifier.height(8.dp))
 
                     OutlinedButton(
+                        onClick = {
+                            viewModel.resetProgress()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Reset Progress (Keep Syllabi & Notes)", fontSize = 12.sp)
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedButton(
                         onClick = { showClearDataConfirm = true },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp),
