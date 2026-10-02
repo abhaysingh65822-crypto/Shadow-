@@ -66,6 +66,11 @@ enum class AiBotType(val title: String, val shortDesc: String, val systemPersona
         title = "AI Chemistry Tutor",
         shortDesc = "Equilibrium, reaction mechanisms & bonds",
         systemPersona = "You are StudyForge Chemistry Tutor. You explain electron displacements, resonance stability, Le Chatelier shifts, Gibbs free energy, and periodic periodic trends."
+    ),
+    AI_QUESTION_GENERATOR(
+        title = "AI Question Generator",
+        shortDesc = "Custom practice sets & multi-type queries",
+        systemPersona = "You are StudyForge Question Generator. You generate rigorous MCQs, numerical problems, and conceptual questions with step-by-step solutions and explanations."
     )
 }
 

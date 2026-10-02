@@ -274,7 +274,7 @@ class StudyForgeRepository(private val dao: StudyForgeDao) {
     // ==========================================
     // Gamification & Streak Logic
     // ==========================================
-    private suspend fun awardXp(amount: Int) {
+    suspend fun awardXp(amount: Int) {
         val profile = dao.getUserProfileSync() ?: SeedData.defaultProfile
         val newXp = profile.totalXp + amount
         val newLevel = (newXp / 300) + 1

@@ -52,6 +52,14 @@ class AiProviderManager(
             isPreview = true
         ),
         AiModelInfo(
+            id = "gemini-3.1-flash-lite-preview",
+            provider = AiProviderType.GEMINI,
+            displayName = "Gemini 3.1 Flash Lite",
+            description = "Ultra-fast response model optimized for low latency and flash calculations",
+            contextWindow = "1M tokens",
+            isPreview = true
+        ),
+        AiModelInfo(
             id = "gemini-flash-latest",
             provider = AiProviderType.GEMINI,
             displayName = "Gemini Flash Latest",
@@ -159,7 +167,9 @@ class AiProviderManager(
     suspend fun generateResponse(
         botType: AiBotType,
         userPrompt: String,
-        contextSummary: String = ""
+        contextSummary: String = "",
+        history: List<Pair<String, String>> = emptyList(),
+        enableSearchGrounding: Boolean = false
     ): AiResponseResult = withContext(Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
         val provider = getActiveProvider()
@@ -170,10 +180,13 @@ class AiProviderManager(
             append("\n\n[STUDYFORGE ACTIVE STUDENT CONTEXT]\n")
             append(contextSummary)
             append("\nEnsure your answer is direct, deeply educational, structurally organized with markdown, and tailored to the student's study level.")
+            if (enableSearchGrounding) {
+                append("\nSearch grounding is active. Use current and accurate information from Google Search where applicable.")
+            }
         }
 
         // Try Live API first
-        val liveResult = executeLiveRequest(provider, model, fullSystemInstruction, userPrompt)
+        val liveResult = executeLiveRequest(provider, model, fullSystemInstruction, userPrompt, history, enableSearchGrounding)
 
         val finalResult = if (liveResult.error == null && liveResult.text.isNotBlank()) {
             liveResult
@@ -215,7 +228,9 @@ class AiProviderManager(
         provider: AiProviderType,
         modelId: String,
         systemInstruction: String,
-        prompt: String
+        prompt: String,
+        history: List<Pair<String, String>> = emptyList(),
+        enableSearchGrounding: Boolean = false
     ): AiResponseResult {
         val startTime = System.currentTimeMillis()
         return when (provider) {
@@ -234,20 +249,32 @@ class AiProviderManager(
                 try {
                     val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelId:generateContent?key=$apiKey"
                     val requestJson = JSONObject().apply {
-                        val contents = JSONArray().apply {
-                            put(JSONObject().apply {
-                                val parts = JSONArray().apply {
-                                    put(JSONObject().put("text", prompt))
-                                }
-                                put("parts", parts)
-                            })
+                        val contents = JSONArray()
+                        // Multi-turn conversation turns
+                        for ((role, text) in history) {
+                            if (text.isNotBlank()) {
+                                contents.put(JSONObject().apply {
+                                    put("role", if (role.equals("USER", ignoreCase = true)) "user" else "model")
+                                    put("parts", JSONArray().put(JSONObject().put("text", text)))
+                                })
+                            }
                         }
+                        // Current user prompt
+                        contents.put(JSONObject().apply {
+                            put("role", "user")
+                            put("parts", JSONArray().put(JSONObject().put("text", prompt)))
+                        })
                         put("contents", contents)
                         put("systemInstruction", JSONObject().apply {
                             put("parts", JSONArray().apply {
                                 put(JSONObject().put("text", systemInstruction))
                             })
                         })
+                        if (enableSearchGrounding) {
+                            put("tools", JSONArray().put(JSONObject().apply {
+                                put("googleSearch", JSONObject())
+                            }))
+                        }
                     }
 
                     val mediaType = "application/json; charset=utf-8".toMediaType()
@@ -276,7 +303,15 @@ class AiProviderManager(
                     val candidate = candidates?.optJSONObject(0)
                     val content = candidate?.optJSONObject("content")
                     val parts = content?.optJSONArray("parts")
-                    val reply = parts?.optJSONObject(0)?.optString("text") ?: "No response generated."
+                    var reply = parts?.optJSONObject(0)?.optString("text") ?: "No response generated."
+
+                    // If grounding metadata is present, append citation summary note
+                    val grounding = candidate?.optJSONObject("groundingMetadata")
+                    val queries = grounding?.optJSONArray("webSearchQueries")
+                    if (queries != null && queries.length() > 0) {
+                        val searchTerms = (0 until queries.length()).map { queries.getString(it) }.joinToString(", ")
+                        reply += "\n\n---\n*Grounded with Google Search data ($searchTerms)*"
+                    }
 
                     AiResponseResult(
                         text = reply,
@@ -579,6 +614,27 @@ class AiProviderManager(
                 #### Challenge for You:
                 If we double the velocity of an object, by what factor does its stopping distance increase under constant braking friction?
                 (Hint: Think about kinetic energy proportional to v^2 versus work done W = f * d!)
+                """.trimIndent()
+            }
+            AiBotType.AI_QUESTION_GENERATOR -> {
+                """
+                ### ❓ StudyForge AI Question Generator
+                
+                **Generated Questions for:** "$userPrompt"
+                
+                #### Question 1 (MCQ - Single Choice):
+                Q. An ideal Carnot heat engine operates between temperatures 500 K and 300 K. What is the maximum theoretical efficiency of this engine?
+                * A) 30%
+                * B) 40%
+                * C) 60%
+                * D) 20%
+                
+                **Correct Answer:** B) 40%
+                **Solution:** Efficiency η = 1 - (T_C / T_H) = 1 - (300 / 500) = 1 - 0.6 = 0.40 = 40%.
+                
+                #### Question 2 (Numerical / Conceptual):
+                Q. If the temperature of the cold reservoir is lowered by 50 K while the hot reservoir remains at 500 K, calculate the new efficiency.
+                **Answer:** η_new = 1 - (250 / 500) = 50%.
                 """.trimIndent()
             }
         }

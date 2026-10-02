@@ -7,8 +7,11 @@ import com.example.ai.AiBotType
 import com.example.ai.AiProviderManager
 import com.example.ai.AiProviderType
 import com.example.ai.AiResponseResult
+import com.example.data.BookmarkEntity
 import com.example.data.ChapterEntity
+import com.example.data.DeckEntity
 import com.example.data.FlashcardEntity
+import com.example.data.MistakeEntity
 import com.example.data.NoteEntity
 import com.example.data.NotificationItemEntity
 import com.example.data.PlannerTaskEntity
@@ -137,6 +140,7 @@ class StudyForgeViewModel(application: Application) : AndroidViewModel(applicati
     )
     val aiChatInput = MutableStateFlow("")
     val aiIsGenerating = MutableStateFlow(false)
+    val aiSearchGroundingEnabled = MutableStateFlow(false)
 
     // Flashcard review state
     val activeCardIndex = MutableStateFlow(0)
@@ -174,10 +178,10 @@ class StudyForgeViewModel(application: Application) : AndroidViewModel(applicati
     // ==========================================
     // Test Engine Operations
     // ==========================================
-    fun startTest(test: TestEntity) {
+    fun startTest(test: TestEntity, customQuestions: List<QuestionEntity>? = null) {
         viewModelScope.launch {
             val allQ = questions.value
-            val testQuestions = if (allQ.isNotEmpty()) allQ.shuffled().take(test.totalQuestions) else SeedData.questions
+            val testQuestions = customQuestions ?: if (allQ.isNotEmpty()) allQ.shuffled().take(test.totalQuestions) else SeedData.questions
             _activeTestState.value = ActiveTestState(
                 test = test,
                 questions = testQuestions,
@@ -468,7 +472,14 @@ class StudyForgeViewModel(application: Application) : AndroidViewModel(applicati
             val weak = weakTopics.value.joinToString { it.title }
             val contextSummary = "Exam: ${prof?.examTargetName} (${prof?.examTargetDaysRemaining} days remaining). Weak areas: $weak. Active streak: ${prof?.currentStreak} days."
 
-            val result = aiManager.generateResponse(selectedBot.value, text, contextSummary)
+            val pastHistory = history.dropLast(1)
+            val result = aiManager.generateResponse(
+                botType = selectedBot.value,
+                userPrompt = text,
+                contextSummary = contextSummary,
+                history = pastHistory,
+                enableSearchGrounding = aiSearchGroundingEnabled.value
+            )
 
             val updatedHistory = aiChatMessages.value.toMutableList()
             updatedHistory.add("BOT" to result.text)
@@ -937,6 +948,12 @@ class StudyForgeViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    fun awardXp(amount: Int) {
+        viewModelScope.launch {
+            repository.awardXp(amount)
+        }
+    }
+
     fun retryMistake(mistake: MistakeEntity) {
         val q = questions.value.find { it.id == mistake.questionId }
         if (q != null) {
@@ -949,7 +966,7 @@ class StudyForgeViewModel(application: Application) : AndroidViewModel(applicati
                     totalMarks = 4,
                     totalQuestions = 1
                 ),
-                questionsToUse = listOf(q)
+                customQuestions = listOf(q)
             )
         } else {
             navigateTo(StudyForgeRoute.QuestionBank)

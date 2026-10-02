@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.EventNote
+import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -21,14 +22,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ai.AiBotType
+import com.example.data.NoteEntity
 import com.example.ui.StudyForgeViewModel
 import com.example.ui.theme.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun AiBotsScreen(viewModel: StudyForgeViewModel) {
@@ -36,7 +41,15 @@ fun AiBotsScreen(viewModel: StudyForgeViewModel) {
     val chatMessages by viewModel.aiChatMessages.collectAsStateWithLifecycle()
     val inputMessage by viewModel.aiChatInput.collectAsStateWithLifecycle()
     val isGenerating by viewModel.aiIsGenerating.collectAsStateWithLifecycle()
+    val searchGrounding by viewModel.aiSearchGroundingEnabled.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
+    val clipboardManager = LocalClipboardManager.current
+    val coroutineScope = rememberCoroutineScope()
+    var savedNotice by remember { mutableStateOf<String?>(null) }
+
+    val currentModel = remember(viewModel.aiManager.getSelectedModel()) {
+        viewModel.aiManager.getSelectedModel()
+    }
 
     LaunchedEffect(chatMessages.size) {
         if (chatMessages.isNotEmpty()) {
@@ -85,6 +98,7 @@ fun AiBotsScreen(viewModel: StudyForgeViewModel) {
                                         AiBotType.AI_REVISION_COACH -> Icons.Default.Replay
                                         AiBotType.AI_NOTES_ASSISTANT -> Icons.Default.Description
                                         AiBotType.AI_FLASHCARD_GENERATOR -> Icons.Default.Style
+                                        AiBotType.AI_QUESTION_GENERATOR -> Icons.AutoMirrored.Filled.HelpOutline
                                         else -> Icons.Default.Psychology
                                     },
                                     contentDescription = null,
@@ -126,19 +140,6 @@ fun AiBotsScreen(viewModel: StudyForgeViewModel) {
                 )
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = ForgeIndigoLight.copy(alpha = 0.15f)
-                    ) {
-                        Text(
-                            text = viewModel.aiManager.getSelectedModel(),
-                            color = ForgeIndigoLight,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(6.dp))
                     IconButton(
                         onClick = {
                             viewModel.aiChatMessages.value = listOf(
@@ -153,6 +154,88 @@ fun AiBotsScreen(viewModel: StudyForgeViewModel) {
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp)
                         )
+                    }
+                }
+            }
+        }
+
+        // Model & Search Grounding Controls Bar
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.surface
+        ) {
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                item {
+                    FilterChip(
+                        selected = searchGrounding,
+                        onClick = { viewModel.aiSearchGroundingEnabled.value = !searchGrounding },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        },
+                        label = { Text("Google Search Grounding", fontSize = 11.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = ForgeEmerald.copy(alpha = 0.2f),
+                            selectedLabelColor = ForgeEmerald
+                        )
+                    )
+                }
+
+                item {
+                    FilterChip(
+                        selected = viewModel.aiManager.getSelectedModel() == "gemini-3.5-flash",
+                        onClick = { viewModel.aiManager.setSelectedModel("gemini-3.5-flash") },
+                        label = { Text("Gemini 3.5 Flash", fontSize = 11.sp) }
+                    )
+                }
+
+                item {
+                    FilterChip(
+                        selected = viewModel.aiManager.getSelectedModel() == "gemini-3.1-pro-preview",
+                        onClick = { viewModel.aiManager.setSelectedModel("gemini-3.1-pro-preview") },
+                        label = { Text("3.1 Pro (Complex Reasoning)", fontSize = 11.sp) }
+                    )
+                }
+
+                item {
+                    FilterChip(
+                        selected = viewModel.aiManager.getSelectedModel() == "gemini-3.1-flash-lite-preview",
+                        onClick = { viewModel.aiManager.setSelectedModel("gemini-3.1-flash-lite-preview") },
+                        label = { Text("3.1 Flash Lite (Fast)", fontSize = 11.sp) }
+                    )
+                }
+            }
+        }
+
+        if (savedNotice != null) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = ForgeEmerald.copy(alpha = 0.15f)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = savedNotice ?: "",
+                        fontSize = 11.sp,
+                        color = ForgeEmerald,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    IconButton(onClick = { savedNotice = null }, modifier = Modifier.size(20.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Dismiss", modifier = Modifier.size(14.dp))
                     }
                 }
             }
@@ -188,7 +271,7 @@ fun AiBotsScreen(viewModel: StudyForgeViewModel) {
                     }
 
                     Card(
-                        modifier = Modifier.widthIn(max = 300.dp),
+                        modifier = Modifier.widthIn(max = 320.dp),
                         shape = RoundedCornerShape(
                             topStart = 16.dp,
                             topEnd = 16.dp,
@@ -199,24 +282,80 @@ fun AiBotsScreen(viewModel: StudyForgeViewModel) {
                             containerColor = if (isUser) ForgeIndigo else MaterialTheme.colorScheme.surfaceVariant
                         )
                     ) {
-                        Text(
-                            text = text,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (isUser) Color.White else MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(14.dp),
-                            lineHeight = 20.sp
-                        )
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Text(
+                                text = text,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (isUser) Color.White else MaterialTheme.colorScheme.onSurface,
+                                lineHeight = 20.sp
+                            )
+
+                            if (!isUser && text.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    IconButton(
+                                        onClick = {
+                                            clipboardManager.setText(AnnotatedString(text))
+                                            savedNotice = "Copied to clipboard!"
+                                        },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.ContentCopy,
+                                            contentDescription = "Copy",
+                                            modifier = Modifier.size(14.dp),
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.width(6.dp))
+
+                                    IconButton(
+                                        onClick = {
+                                            coroutineScope.launch {
+                                                viewModel.repository.insertNote(
+                                                    NoteEntity(
+                                                        title = "${selectedBot.title} Insight",
+                                                        contentMarkdown = text,
+                                                        subjectName = "AI Notes"
+                                                    )
+                                                )
+                                                savedNotice = "Saved to Study Notes!"
+                                            }
+                                        },
+                                        modifier = Modifier.size(24.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.BookmarkAdd,
+                                            contentDescription = "Save to Notes",
+                                            modifier = Modifier.size(14.dp),
+                                            tint = ForgeAmber
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
 
             if (isGenerating) {
                 item {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                        Spacer(modifier = Modifier.width(8.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = ForgeIndigoLight,
+                            strokeWidth = 2.dp
+                        )
                         Text(
-                            text = "${selectedBot.title} is synthesizing answer...",
+                            text = if (searchGrounding) "${selectedBot.title} is researching via Google Search..." else "${selectedBot.title} is synthesizing conceptual answer...",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -225,97 +364,53 @@ fun AiBotsScreen(viewModel: StudyForgeViewModel) {
             }
         }
 
-        // Quick Pedagogical & Suggestion Chips
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp)
-        ) {
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                val cognitiveModes = listOf(
-                    "💡 Simplify" to "Simplify the explanation and explain like I'm a beginner: ",
-                    "🔬 Analogy" to "Give me an intuitive real-world analogy for: ",
-                    "📝 Step-by-Step" to "Solve this step-by-step with formulas and derivations: ",
-                    "🎯 Quiz Me" to "Ask me a conceptual multiple-choice question on: ",
-                    "🔍 Find Mistake" to "Here is my reasoning/solution, please diagnose my misconception: "
-                )
-                items(cognitiveModes) { (label, prefix) ->
-                    SuggestionChip(
-                        onClick = {
-                            val currentInput = viewModel.aiChatInput.value
-                            viewModel.aiChatInput.value = if (currentInput.isNotBlank()) "$prefix$currentInput" else prefix
-                        },
-                        label = { Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
-                    )
-                }
-            }
-
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 2.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                val suggestions = when (selectedBot) {
-                    AiBotType.AI_PHYSICS_TUTOR -> listOf("Friction vs Applied Force", "Moment of inertia of sphere", "Work energy theorem proof")
-                    AiBotType.AI_CHEMISTRY_TUTOR -> listOf("Le Chatelier equilibrium shifts", "Inert gas effect at constant V", "Exothermic reaction temperature rule")
-                    AiBotType.AI_MATHEMATICS_SOLVER -> listOf("Evaluate limit of (sin(3x)-3x)/x^3", "Leibniz rule differentiation", "Integration by parts trick")
-                    AiBotType.AI_CODING_TUTOR -> listOf("Time complexity of BST search", "Array lookup vs Hash map", "Two pointer technique")
-                    AiBotType.AI_PLANNER -> listOf("Plan my 2-hour study routine", "Reschedule missed tasks", "Prep for upcoming exam")
-                    else -> listOf("Explain my weak topics", "Test me on Kinematics", "Create revision sheet")
-                }
-                items(suggestions) { sugg ->
-                    SuggestionChip(
-                        onClick = {
-                            viewModel.aiChatInput.value = sugg
-                            viewModel.sendAiChatMessage()
-                        },
-                        label = { Text(sugg, fontSize = 11.sp) }
-                    )
-                }
-            }
-        }
-
-        // Input Field & Send Action
+        // Input Field and Send Button
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surface,
-            shadowElevation = 4.dp
+            shadowElevation = 8.dp
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 OutlinedTextField(
                     value = inputMessage,
                     onValueChange = { viewModel.aiChatInput.value = it },
-                    placeholder = { Text("Ask ${selectedBot.title}...") },
+                    placeholder = {
+                        Text(
+                            "Ask ${selectedBot.title}...",
+                            fontSize = 13.sp
+                        )
+                    },
                     modifier = Modifier
                         .weight(1f)
-                        .testTag("ai_input_field"),
+                        .testTag("ai_chat_input"),
                     shape = RoundedCornerShape(24.dp),
-                    maxLines = 3
+                    maxLines = 4,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = ForgeIndigoLight,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
+                    )
                 )
+
                 Spacer(modifier = Modifier.width(8.dp))
-                IconButton(
+
+                FloatingActionButton(
                     onClick = { viewModel.sendAiChatMessage() },
-                    enabled = inputMessage.isNotBlank() && !isGenerating,
                     modifier = Modifier
-                        .size(48.dp)
-                        .background(if (inputMessage.isNotBlank()) ForgeIndigo else MaterialTheme.colorScheme.surfaceVariant, CircleShape)
-                        .testTag("ai_send_button")
+                        .size(44.dp)
+                        .testTag("send_ai_button"),
+                    containerColor = ForgeIndigo,
+                    contentColor = Color.White,
+                    shape = CircleShape
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Send,
                         contentDescription = "Send",
-                        tint = if (inputMessage.isNotBlank()) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
