@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.ui.StudyForgeRoute
 import com.example.ui.StudyForgeViewModel
+import com.example.ui.components.TaskCompletionChartComponent
 import com.example.ui.theme.*
 
 @Composable
@@ -283,6 +284,17 @@ fun DashboardScreen(viewModel: StudyForgeViewModel) {
                     }
                 }
             }
+        }
+
+        // Task Completion Analytics & Visualizer Chart
+        item {
+            TaskCompletionChartComponent(
+                tasks = plannerTasks,
+                onOpenPlanner = { viewModel.navigateTo(StudyForgeRoute.Planner) },
+                onGenerateAiPlan = {
+                    viewModel.generateAiStudyPlan { _, _ -> }
+                }
+            )
         }
 
         // Quick Navigation Tiles
