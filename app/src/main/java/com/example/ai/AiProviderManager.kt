@@ -793,4 +793,174 @@ class AiProviderManager(
         }
         Pair(chapters, topics)
     }
+
+    suspend fun generateStructuredFlashcards(
+        topic: String,
+        count: Int,
+        deckId: Long
+    ): List<com.example.data.FlashcardEntity> = withContext(Dispatchers.IO) {
+        val prompt = "Generate exactly $count high-yield active recall flashcards for Topic: \"$topic\". Return ONLY a valid JSON array of objects with keys: \"front\" (string: concise question or formula trigger) and \"back\" (string: exact principle, derivation, or formula answer). Do not wrap in markdown fences if possible."
+        val result = executeLiveRequest(
+            getActiveProvider(),
+            getSelectedModel(),
+            "You are an expert tutor creating atomic active-recall flashcards. Output valid JSON array only.",
+            prompt
+        )
+        val cards = mutableListOf<com.example.data.FlashcardEntity>()
+        if (result.error == null && result.text.isNotBlank()) {
+            try {
+                var cleanJson = result.text.trim()
+                if (cleanJson.startsWith("```json")) cleanJson = cleanJson.removePrefix("```json")
+                if (cleanJson.startsWith("```")) cleanJson = cleanJson.removePrefix("```")
+                if (cleanJson.endsWith("```")) cleanJson = cleanJson.removeSuffix("```")
+                cleanJson = cleanJson.trim()
+                val jsonArr = JSONArray(cleanJson)
+                for (i in 0 until jsonArr.length()) {
+                    val obj = jsonArr.getJSONObject(i)
+                    val front = obj.optString("front", "").trim()
+                    val back = obj.optString("back", "").trim()
+                    if (front.isNotBlank() && back.isNotBlank()) {
+                        cards.add(
+                            com.example.data.FlashcardEntity(
+                                deckId = deckId,
+                                front = front,
+                                back = back,
+                                cardType = "STANDARD",
+                                repetitions = 0,
+                                intervalDays = 1,
+                                easeFactor = 2.5f,
+                                dueDate = System.currentTimeMillis()
+                            )
+                        )
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+        if (cards.isEmpty()) {
+            cards.add(
+                com.example.data.FlashcardEntity(
+                    deckId = deckId,
+                    front = "What is the defining formula / governing equation of $topic?",
+                    back = "State the core equation for $topic, define all variables (scalar/vector), and write the corresponding SI units.",
+                    cardType = "STANDARD",
+                    repetitions = 0,
+                    intervalDays = 1,
+                    easeFactor = 2.5f,
+                    dueDate = System.currentTimeMillis()
+                )
+            )
+            cards.add(
+                com.example.data.FlashcardEntity(
+                    deckId = deckId,
+                    front = "What are the boundary conditions and limitations of $topic?",
+                    back = "Analyze the conditions where the laws of $topic apply (e.g. constant acceleration, closed system, ideal state, conservative forces).",
+                    cardType = "STANDARD",
+                    repetitions = 0,
+                    intervalDays = 1,
+                    easeFactor = 2.5f,
+                    dueDate = System.currentTimeMillis()
+                )
+            )
+            cards.add(
+                com.example.data.FlashcardEntity(
+                    deckId = deckId,
+                    front = "How is $topic applied in real-world exam problem-solving?",
+                    back = "Identify key problem triggers, diagram conventions, and common calculation pitfalls for $topic.",
+                    cardType = "STANDARD",
+                    repetitions = 0,
+                    intervalDays = 1,
+                    easeFactor = 2.5f,
+                    dueDate = System.currentTimeMillis()
+                )
+            )
+        }
+        cards
+    }
+
+    suspend fun generateStructuredStudyPlan(
+        targetExam: String,
+        subjectsList: List<String>,
+        weakTopicsList: List<String>
+    ): List<com.example.data.PlannerTaskEntity> = withContext(Dispatchers.IO) {
+        val subsStr = if (subjectsList.isNotEmpty()) subjectsList.joinToString(", ") else "Physics, Chemistry, Mathematics"
+        val weakStr = if (weakTopicsList.isNotEmpty()) weakTopicsList.joinToString(", ") else "Electromagnetism, Organic Mechanisms, Integration"
+        val prompt = "Generate a 5-task prioritized study timetable for a student preparing for '$targetExam'. Subjects available: $subsStr. Weak concepts that need revision: $weakStr. Return ONLY a valid JSON array of objects with keys: \"title\" (string), \"subject\" (string), \"chapter\" (string), \"durationMinutes\" (int, between 25 and 90), \"taskType\" (one of: STUDY, PRACTICE, REVISION, MOCK_TEST), \"priority\" (one of: HIGH, MEDIUM, LOW), \"daysOffset\" (int, 0 for today, 1 for tomorrow, 2 for day after). Output valid JSON array only."
+
+        val result = executeLiveRequest(
+            getActiveProvider(),
+            getSelectedModel(),
+            "You are an academic coach and study scheduler. Output valid JSON only.",
+            prompt
+        )
+        val tasks = mutableListOf<com.example.data.PlannerTaskEntity>()
+        val baseTime = System.currentTimeMillis()
+
+        if (result.error == null && result.text.isNotBlank()) {
+            try {
+                var cleanJson = result.text.trim()
+                if (cleanJson.startsWith("```json")) cleanJson = cleanJson.removePrefix("```json")
+                if (cleanJson.startsWith("```")) cleanJson = cleanJson.removePrefix("```")
+                if (cleanJson.endsWith("```")) cleanJson = cleanJson.removeSuffix("```")
+                cleanJson = cleanJson.trim()
+                val jsonArr = JSONArray(cleanJson)
+                for (i in 0 until jsonArr.length()) {
+                    val obj = jsonArr.getJSONObject(i)
+                    val title = obj.optString("title", "Study Session ${i + 1}")
+                    val subj = obj.optString("subject", subjectsList.firstOrNull() ?: "General")
+                    val chap = obj.optString("chapter", "High Yield Topics")
+                    val dur = obj.optInt("durationMinutes", 45).coerceIn(15, 120)
+                    val type = obj.optString("taskType", "STUDY")
+                    val prio = obj.optString("priority", "HIGH")
+                    val offset = obj.optInt("daysOffset", i % 3)
+                    tasks.add(
+                        com.example.data.PlannerTaskEntity(
+                            title = title,
+                            subjectName = subj,
+                            chapterName = chap,
+                            durationMinutes = dur,
+                            taskType = type,
+                            priority = prio,
+                            scheduledDate = baseTime + (offset * 86400000L),
+                            isCompleted = false
+                        )
+                    )
+                }
+            } catch (_: Exception) {}
+        }
+
+        if (tasks.isEmpty()) {
+            var offset = 0
+            weakTopicsList.take(2).forEach { weak ->
+                tasks.add(
+                    com.example.data.PlannerTaskEntity(
+                        title = "Weak Concept Remediation: $weak",
+                        subjectName = subjectsList.firstOrNull() ?: "Core Science",
+                        chapterName = "Diagnostic Focus",
+                        durationMinutes = 40,
+                        taskType = "REVISION",
+                        priority = "HIGH",
+                        scheduledDate = baseTime + (offset * 86400000L),
+                        isCompleted = false
+                    )
+                )
+                offset++
+            }
+            subjectsList.take(3).forEach { sub ->
+                tasks.add(
+                    com.example.data.PlannerTaskEntity(
+                        title = "Practice Problem Set & Drill: $sub",
+                        subjectName = sub,
+                        chapterName = "Key Chapter",
+                        durationMinutes = 45,
+                        taskType = "PRACTICE",
+                        priority = "MEDIUM",
+                        scheduledDate = baseTime + (offset * 86400000L),
+                        isCompleted = false
+                    )
+                )
+                offset++
+            }
+        }
+        tasks
+    }
 }

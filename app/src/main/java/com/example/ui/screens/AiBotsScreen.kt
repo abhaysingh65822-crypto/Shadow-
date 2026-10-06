@@ -37,6 +37,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun AiBotsScreen(viewModel: StudyForgeViewModel) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val selectedBot by viewModel.selectedBot.collectAsStateWithLifecycle()
     val chatMessages by viewModel.aiChatMessages.collectAsStateWithLifecycle()
     val inputMessage by viewModel.aiChatInput.collectAsStateWithLifecycle()
@@ -365,6 +366,60 @@ fun AiBotsScreen(viewModel: StudyForgeViewModel) {
         }
 
         // Input Field and Send Button
+        var showAttachNotice by remember { mutableStateOf<String?>(null) }
+        val aiFilePickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+            contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+        ) { uri ->
+            if (uri != null) {
+                try {
+                    var displayName = "Document_${System.currentTimeMillis() % 1000}"
+                    context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                        val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                        if (nameIndex != -1 && cursor.moveToFirst()) {
+                            displayName = cursor.getString(nameIndex)
+                        }
+                    }
+                    var contentText = ""
+                    try {
+                        context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { reader ->
+                            contentText = reader.readText()
+                        }
+                    } catch (_: Exception) {
+                        contentText = ""
+                    }
+                    val docTitle = displayName
+                    val docExtract = if (contentText.isNotBlank()) contentText.take(1500) else "Imported file content from $displayName"
+                    viewModel.aiChatInput.value = "Analyze and summarize this document ($docTitle):\n\n\"$docExtract\""
+                    showAttachNotice = "Attached '$docTitle' to AI prompt!"
+                } catch (e: Exception) {
+                    showAttachNotice = "Failed to load file: ${e.localizedMessage}"
+                }
+            }
+        }
+
+        if (showAttachNotice != null) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = ForgeCyan.copy(alpha = 0.15f)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = showAttachNotice ?: "",
+                        fontSize = 11.sp,
+                        color = ForgeCyanLight,
+                        fontWeight = FontWeight.Medium
+                    )
+                    IconButton(onClick = { showAttachNotice = null }, modifier = Modifier.size(20.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", modifier = Modifier.size(12.dp))
+                    }
+                }
+            }
+        }
+
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = MaterialTheme.colorScheme.surface,
@@ -376,6 +431,20 @@ fun AiBotsScreen(viewModel: StudyForgeViewModel) {
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                IconButton(
+                    onClick = { aiFilePickerLauncher.launch("*/*") },
+                    modifier = Modifier.size(40.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AttachFile,
+                        contentDescription = "Attach Document",
+                        tint = ForgeIndigoLight,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+
                 OutlinedTextField(
                     value = inputMessage,
                     onValueChange = { viewModel.aiChatInput.value = it },

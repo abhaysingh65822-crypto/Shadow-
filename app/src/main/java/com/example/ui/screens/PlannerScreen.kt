@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -28,13 +29,16 @@ import kotlinx.coroutines.launch
 fun PlannerScreen(viewModel: StudyForgeViewModel) {
     val tasks by viewModel.plannerTasks.collectAsStateWithLifecycle()
     val subjects by viewModel.subjects.collectAsStateWithLifecycle()
+    val profile by viewModel.userProfile.collectAsStateWithLifecycle()
 
+    var selectedTab by remember { mutableStateOf("ALL") } // ALL, TODAY, TOMORROW, HIGH_PRIORITY
     var showAddTaskDialog by remember { mutableStateOf(false) }
     var newTaskTitle by remember { mutableStateOf("") }
-    var newTaskSubject by remember { mutableStateOf("Physics") }
+    var newTaskSubject by remember { mutableStateOf(subjects.firstOrNull()?.name ?: "Physics") }
     var newTaskDuration by remember { mutableStateOf("45") }
     var newTaskType by remember { mutableStateOf("STUDY") }
     var newTaskPriority by remember { mutableStateOf("HIGH") }
+    var newTaskDayOffset by remember { mutableIntStateOf(0) } // 0=Today, 1=Tomorrow, 2=In 2 Days
 
     var editingTask by remember { mutableStateOf<PlannerTaskEntity?>(null) }
     var editTitle by remember { mutableStateOf("") }
@@ -45,6 +49,20 @@ fun PlannerScreen(viewModel: StudyForgeViewModel) {
     var isAiGeneratingPlan by remember { mutableStateOf(false) }
     var planMessage by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
+
+    val filteredTasks = remember(tasks, selectedTab) {
+        val now = System.currentTimeMillis()
+        when (selectedTab) {
+            "TODAY" -> tasks.filter { Math.abs(it.scheduledDate - now) < 86400000L }
+            "TOMORROW" -> tasks.filter { it.scheduledDate - now in 86400000L..172800000L }
+            "HIGH_PRIORITY" -> tasks.filter { it.priority.equals("HIGH", ignoreCase = true) }
+            else -> tasks
+        }
+    }
+
+    val totalPlannedMinutes = remember(filteredTasks) {
+        filteredTasks.filter { !it.isCompleted }.sumOf { it.durationMinutes }
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -59,7 +77,7 @@ fun PlannerScreen(viewModel: StudyForgeViewModel) {
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                border = androidx.compose.foundation.BorderStroke(1.dp, ForgeIndigoLight.copy(alpha = 0.3f))
+                border = androidx.compose.foundation.BorderStroke(1.dp, ForgeIndigoLight.copy(alpha = 0.35f))
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(
@@ -74,7 +92,7 @@ fun PlannerScreen(viewModel: StudyForgeViewModel) {
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "AI-optimized high-yield study blocks",
+                                text = "Target: ${profile?.examTargetName ?: "General Prep"} • ${totalPlannedMinutes / 60}h ${totalPlannedMinutes % 60}m planned",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -84,6 +102,7 @@ fun PlannerScreen(viewModel: StudyForgeViewModel) {
                             OutlinedButton(
                                 onClick = {
                                     isAiGeneratingPlan = true
+                                    planMessage = "Synthesizing customized timetable with AI..."
                                     viewModel.generateAiStudyPlan { success, msg ->
                                         isAiGeneratingPlan = false
                                         planMessage = msg
@@ -93,15 +112,25 @@ fun PlannerScreen(viewModel: StudyForgeViewModel) {
                                 contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
                                 enabled = !isAiGeneratingPlan
                             ) {
-                                Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(if (isAiGeneratingPlan) "Planning..." else "AI Plan", fontSize = 12.sp)
+                                if (isAiGeneratingPlan) {
+                                    CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Planning...", fontSize = 12.sp)
+                                } else {
+                                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("AI Timetable", fontSize = 12.sp)
+                                }
                             }
 
                             Button(
-                                onClick = { showAddTaskDialog = true },
+                                onClick = {
+                                    newTaskTitle = ""
+                                    showAddTaskDialog = true
+                                },
                                 shape = RoundedCornerShape(10.dp),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = ForgeIndigo)
                             ) {
                                 Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
@@ -111,14 +140,44 @@ fun PlannerScreen(viewModel: StudyForgeViewModel) {
                     }
 
                     if (planMessage != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = planMessage ?: "",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = ForgeEmerald,
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = ForgeEmerald.copy(alpha = 0.15f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = planMessage ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ForgeEmerald,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
                     }
+                }
+            }
+        }
+
+        // Timetable View Tabs
+        item {
+            val tabsList = listOf(
+                "ALL" to "All Tasks (${tasks.size})",
+                "TODAY" to "Today",
+                "TOMORROW" to "Tomorrow",
+                "HIGH_PRIORITY" to "High Priority"
+            )
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(tabsList) { (tabId, tabLabel) ->
+                    FilterChip(
+                        selected = selectedTab == tabId,
+                        onClick = { selectedTab = tabId },
+                        label = { Text(tabLabel) },
+                        shape = RoundedCornerShape(8.dp)
+                    )
                 }
             }
         }
@@ -130,14 +189,15 @@ fun PlannerScreen(viewModel: StudyForgeViewModel) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Scheduled Tasks (${tasks.count { !it.isCompleted }} Active)",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    text = "${filteredTasks.count { !it.isCompleted }} Active • ${filteredTasks.count { it.isCompleted }} Done",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 TextButton(onClick = {
                     coroutineScope.launch {
                         viewModel.repository.rescheduleMissedTasks()
-                        planMessage = "Tasks re-anchored to active study schedule."
+                        planMessage = "Overdue tasks automatically re-anchored to today."
                     }
                 }) {
                     Icon(Icons.Default.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -147,20 +207,40 @@ fun PlannerScreen(viewModel: StudyForgeViewModel) {
             }
         }
 
-        if (tasks.isEmpty()) {
+        if (filteredTasks.isEmpty()) {
             item {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant
                 ) {
-                    Box(modifier = Modifier.padding(32.dp), contentAlignment = Alignment.Center) {
-                        Text("No tasks scheduled. Tap 'Add Task' or 'AI Plan' to generate your study timetable!")
+                    Column(
+                        modifier = Modifier.padding(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.Default.AssignmentLate,
+                            contentDescription = null,
+                            tint = ForgeIndigoLight,
+                            modifier = Modifier.size(44.dp)
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "No study tasks in this view",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Tap 'AI Timetable' to generate a targeted study plan or create a custom task.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
         } else {
-            items(tasks) { task ->
+            items(filteredTasks) { task ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
@@ -175,26 +255,17 @@ fun PlannerScreen(viewModel: StudyForgeViewModel) {
                     ) {
                         Checkbox(
                             checked = task.isCompleted,
-                            onCheckedChange = { isChecked ->
-                                coroutineScope.launch {
-                                    viewModel.repository.updatePlannerTask(
-                                        task.copy(isCompleted = isChecked)
-                                    )
-                                    if (isChecked) {
-                                        viewModel.awardXp(20)
-                                    }
-                                }
-                            }
+                            onCheckedChange = { viewModel.toggleTaskCompleted(task) }
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Surface(
                                     shape = RoundedCornerShape(4.dp),
                                     color = when (task.taskType) {
                                         "REVISION" -> ForgeAmber.copy(alpha = 0.15f)
                                         "PRACTICE" -> ForgeIndigoLight.copy(alpha = 0.15f)
-                                        "TEST" -> ForgeRose.copy(alpha = 0.15f)
+                                        "MOCK_TEST" -> ForgeRose.copy(alpha = 0.15f)
                                         else -> ForgeCyan.copy(alpha = 0.15f)
                                     }
                                 ) {
@@ -203,7 +274,7 @@ fun PlannerScreen(viewModel: StudyForgeViewModel) {
                                         color = when (task.taskType) {
                                             "REVISION" -> ForgeAmber
                                             "PRACTICE" -> ForgeIndigoLight
-                                            "TEST" -> ForgeRose
+                                            "MOCK_TEST" -> ForgeRose
                                             else -> ForgeCyan
                                         },
                                         fontSize = 9.sp,
@@ -212,16 +283,31 @@ fun PlannerScreen(viewModel: StudyForgeViewModel) {
                                     )
                                 }
                                 Text(
-                                    text = "${task.subjectName} • ${task.durationMinutes}m • ${task.priority}",
+                                    text = "${task.subjectName} • ${task.durationMinutes}m",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
+                                if (task.priority == "HIGH") {
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = ForgeRose.copy(alpha = 0.15f)
+                                    ) {
+                                        Text(
+                                            text = "HIGH",
+                                            color = ForgeRose,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                        )
+                                    }
+                                }
                             }
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = task.title,
                                 style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = if (task.isCompleted) FontWeight.Normal else FontWeight.SemiBold
+                                fontWeight = if (task.isCompleted) FontWeight.Normal else FontWeight.SemiBold,
+                                color = if (task.isCompleted) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
                             )
                         }
 
@@ -244,16 +330,12 @@ fun PlannerScreen(viewModel: StudyForgeViewModel) {
                             }
 
                             IconButton(
-                                onClick = {
-                                    coroutineScope.launch {
-                                        viewModel.repository.deletePlannerTask(task.id)
-                                    }
-                                }
+                                onClick = { viewModel.deletePlannerTask(task.id) }
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.DeleteOutline,
                                     contentDescription = "Delete",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    tint = ForgeRose,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -275,14 +357,14 @@ fun PlannerScreen(viewModel: StudyForgeViewModel) {
                         value = newTaskTitle,
                         onValueChange = { newTaskTitle = it },
                         label = { Text("Task Description") },
-                        placeholder = { Text("e.g. Solve 10 Calculus Integrals") },
+                        placeholder = { Text("e.g. Solve 15 Kinematics Questions") },
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
                         value = newTaskSubject,
                         onValueChange = { newTaskSubject = it },
                         label = { Text("Subject") },
-                        placeholder = { Text("e.g. Physics, Chemistry, Math") },
+                        placeholder = { Text("e.g. Physics, Math, Chemistry") },
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
@@ -291,12 +373,25 @@ fun PlannerScreen(viewModel: StudyForgeViewModel) {
                         label = { Text("Duration (Minutes)") },
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    Text("Schedule When:", style = MaterialTheme.typography.labelSmall)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(0 to "Today", 1 to "Tomorrow", 2 to "In 2 Days").forEach { (offset, lbl) ->
+                            FilterChip(
+                                selected = newTaskDayOffset == offset,
+                                onClick = { newTaskDayOffset = offset },
+                                label = { Text(lbl) }
+                            )
+                        }
+                    }
+
+                    Text("Task Type & Priority:", style = MaterialTheme.typography.labelSmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         listOf("STUDY", "REVISION", "PRACTICE").forEach { type ->
                             FilterChip(
                                 selected = newTaskType == type,
                                 onClick = { newTaskType = type },
-                                label = { Text(type, fontSize = 11.sp) }
+                                label = { Text(type, fontSize = 10.sp) }
                             )
                         }
                     }
@@ -307,20 +402,16 @@ fun PlannerScreen(viewModel: StudyForgeViewModel) {
                     onClick = {
                         val duration = newTaskDuration.toIntOrNull() ?: 45
                         if (newTaskTitle.isNotBlank()) {
-                            coroutineScope.launch {
-                                viewModel.repository.insertPlannerTask(
-                                    PlannerTaskEntity(
-                                        title = newTaskTitle.trim(),
-                                        taskType = newTaskType,
-                                        subjectName = newTaskSubject.trim().ifBlank { "Physics" },
-                                        durationMinutes = duration,
-                                        priority = newTaskPriority,
-                                        scheduledDate = System.currentTimeMillis()
-                                    )
-                                )
-                                showAddTaskDialog = false
-                                newTaskTitle = ""
-                            }
+                            viewModel.addPlannerTask(
+                                title = newTaskTitle,
+                                subjectName = newTaskSubject,
+                                durationMinutes = duration,
+                                taskType = newTaskType,
+                                priority = newTaskPriority,
+                                daysOffset = newTaskDayOffset
+                            )
+                            showAddTaskDialog = false
+                            newTaskTitle = ""
                         }
                     },
                     enabled = newTaskTitle.isNotBlank()

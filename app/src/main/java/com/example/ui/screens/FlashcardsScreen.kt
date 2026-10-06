@@ -25,7 +25,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.ai.AiBotType
 import com.example.data.DeckEntity
 import com.example.data.FlashcardEntity
 import com.example.ui.StudyForgeViewModel
@@ -41,6 +40,8 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
     val isFlipped by viewModel.isCardFlipped.collectAsStateWithLifecycle()
 
     var selectedDeckId by remember { mutableStateOf<Long?>(null) }
+    var reviewAllMode by remember { mutableStateOf(false) }
+
     var showAiGeneratorDialog by remember { mutableStateOf(false) }
     var showManualAddDialog by remember { mutableStateOf(false) }
     var showAddDeckDialog by remember { mutableStateOf(false) }
@@ -54,7 +55,9 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
     var manualFront by remember { mutableStateOf("") }
     var manualBack by remember { mutableStateOf("") }
     var generatorTopic by remember { mutableStateOf("") }
+    var generatorCount by remember { mutableIntStateOf(3) }
     var isAiGenerating by remember { mutableStateOf(false) }
+    var aiStatusMessage by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
 
     val deckFilteredCards = remember(allCards, selectedDeckId) {
@@ -62,8 +65,17 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
         else allCards.filter { it.deckId == selectedDeckId }
     }
 
-    val currentCards = if (selectedDeckId != null) deckFilteredCards else (if (dueCards.isNotEmpty()) dueCards else allCards)
-    val activeCard = currentCards.getOrNull(cardIndex.coerceIn(0, (currentCards.size - 1).coerceAtLeast(0)))
+    // Determine deck-specific due cards
+    val activeCardsPool = remember(deckFilteredCards, dueCards, reviewAllMode, selectedDeckId) {
+        if (reviewAllMode) {
+            deckFilteredCards
+        } else {
+            val due = if (selectedDeckId == null) dueCards else dueCards.filter { it.deckId == selectedDeckId }
+            if (due.isNotEmpty()) due else deckFilteredCards
+        }
+    }
+
+    val activeCard = activeCardsPool.getOrNull(cardIndex.coerceIn(0, (activeCardsPool.size - 1).coerceAtLeast(0)))
 
     LazyColumn(
         modifier = Modifier
@@ -78,7 +90,7 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                border = androidx.compose.foundation.BorderStroke(1.dp, ForgeAmber.copy(alpha = 0.3f))
+                border = androidx.compose.foundation.BorderStroke(1.dp, ForgeAmber.copy(alpha = 0.35f))
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(
@@ -88,12 +100,12 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                     ) {
                         Column {
                             Text(
-                                text = "Spaced Repetition Engine (SM-2)",
+                                text = "Spaced Repetition (SM-2)",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "${dueCards.size} Card(s) Due for Review Today",
+                                text = "${dueCards.size} Due Today • ${allCards.size} Total Stored",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = ForgeAmber,
                                 fontWeight = FontWeight.SemiBold
@@ -112,7 +124,10 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                             }
 
                             Button(
-                                onClick = { showAiGeneratorDialog = true },
+                                onClick = {
+                                    aiStatusMessage = null
+                                    showAiGeneratorDialog = true
+                                },
                                 shape = RoundedCornerShape(10.dp),
                                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = ForgeIndigo)
@@ -167,18 +182,66 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                             )
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Toggle: Due Today vs Review All
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (reviewAllMode) "Mode: Studying all cards in deck" else "Mode: SM-2 Due Review",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        FilterChip(
+                            selected = reviewAllMode,
+                            onClick = { reviewAllMode = !reviewAllMode },
+                            label = { Text(if (reviewAllMode) "All Cards" else "Due Today (${dueCards.size})") },
+                            leadingIcon = {
+                                Icon(
+                                    if (reviewAllMode) Icons.Default.AllInclusive else Icons.Default.Schedule,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                        )
+                    }
                 }
             }
         }
 
         // Active Interactive Flashcard
         item {
-            if (activeCard != null) {
+            if (activeCard != null && activeCardsPool.isNotEmpty()) {
                 val rotation by animateFloatAsState(
                     targetValue = if (isFlipped) 180f else 0f,
-                    animationSpec = tween(400),
+                    animationSpec = tween(350),
                     label = "cardFlip"
                 )
+
+                // Current Card Progress
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Card ${(cardIndex % activeCardsPool.size) + 1} of ${activeCardsPool.size}",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = ForgeIndigoLight
+                    )
+                    Text(
+                        text = "Tap card to flip",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
 
                 Card(
                     modifier = Modifier
@@ -211,7 +274,7 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                             verticalArrangement = Arrangement.Center
                         ) {
                             Text(
-                                text = if (!isFlipped) "QUESTION (TAP TO FLIP)" else "ANSWER & FORMULA",
+                                text = if (!isFlipped) "QUESTION (TAP TO REVEAL)" else "ANSWER & RETENTION",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isFlipped) ForgeCyanLight else ForgeIndigoLight,
@@ -230,7 +293,7 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                             )
                             Spacer(modifier = Modifier.height(16.dp))
                             Text(
-                                text = "Interval: ${activeCard.intervalDays}d • Ease: ${String.format("%.1f", activeCard.easeFactor)}",
+                                text = "Interval: ${activeCard.intervalDays}d • Reps: ${activeCard.repetitions} • Ease: ${String.format("%.1f", activeCard.easeFactor)}",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = if (isFlipped) Color.White.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -238,7 +301,7 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // SM-2 Review Rating Controls
                 Row(
@@ -267,7 +330,7 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("Hard", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            Text("1 Day", fontSize = 10.sp)
+                            Text("2 Days", fontSize = 10.sp)
                         }
                     }
 
@@ -280,7 +343,7 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("Good", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            Text("3 Days", fontSize = 10.sp)
+                            Text("4 Days", fontSize = 10.sp)
                         }
                     }
 
@@ -293,22 +356,55 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text("Easy", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            Text("6 Days", fontSize = 10.sp)
+                            Text("7 Days", fontSize = 10.sp)
                         }
                     }
                 }
             } else {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(16.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant
                 ) {
-                    Box(modifier = Modifier.padding(32.dp), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = if (allCards.isEmpty()) "No flashcards in library. Tap '+ Card' to create one!" else "All flashcard reviews completed for now!",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold
+                    Column(
+                        modifier = Modifier.padding(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.Default.Celebration,
+                            contentDescription = null,
+                            tint = ForgeEmerald,
+                            modifier = Modifier.size(48.dp)
                         )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = if (allCards.isEmpty()) "No flashcards yet" else "All scheduled reviews complete!",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (allCards.isEmpty()) "Generate instant cards with AI or create one manually." else "Great job! You have zero cards due for retention right now.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            if (deckFilteredCards.isNotEmpty()) {
+                                OutlinedButton(
+                                    onClick = { reviewAllMode = true }
+                                ) {
+                                    Text("Study All Anyway")
+                                }
+                            }
+                            Button(
+                                onClick = { showAiGeneratorDialog = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = ForgeIndigo)
+                            ) {
+                                Text("Generate AI Cards")
+                            }
+                        }
                     }
                 }
             }
@@ -323,7 +419,7 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Stored Cards (${deckFilteredCards.size})",
+                    text = "Library Cards (${deckFilteredCards.size})",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -356,6 +452,12 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Interval: ${card.intervalDays}d • Ease: ${String.format("%.1f", card.easeFactor)}",
+                            fontSize = 10.sp,
+                            color = ForgeIndigoLight
+                        )
                     }
 
                     Row {
@@ -376,17 +478,13 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                         }
 
                         IconButton(
-                            onClick = {
-                                coroutineScope.launch {
-                                    viewModel.repository.deleteFlashcard(card.id)
-                                }
-                            },
+                            onClick = { viewModel.deleteFlashcard(card.id) },
                             modifier = Modifier.size(32.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.DeleteOutline,
                                 contentDescription = "Delete Flashcard",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = ForgeRose,
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -406,7 +504,7 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                     OutlinedTextField(
                         value = manualFront,
                         onValueChange = { manualFront = it },
-                        label = { Text("Front (Prompt / Question / Formula)") },
+                        label = { Text("Front (Prompt / Question / Trigger)") },
                         placeholder = { Text("e.g. Formula for kinetic energy") },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -423,19 +521,14 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                 Button(
                     onClick = {
                         if (manualFront.isNotBlank() && manualBack.isNotBlank()) {
-                            coroutineScope.launch {
-                                viewModel.repository.insertFlashcard(
-                                    FlashcardEntity(
-                                        deckId = selectedDeckId ?: 1L,
-                                        front = manualFront.trim(),
-                                        back = manualBack.trim(),
-                                        cardType = "STANDARD"
-                                    )
-                                )
-                                showManualAddDialog = false
-                                manualFront = ""
-                                manualBack = ""
-                            }
+                            viewModel.createCustomFlashcard(
+                                deckId = selectedDeckId ?: 1L,
+                                front = manualFront.trim(),
+                                back = manualBack.trim()
+                            )
+                            showManualAddDialog = false
+                            manualFront = ""
+                            manualBack = ""
                         }
                     },
                     enabled = manualFront.isNotBlank() && manualBack.isNotBlank()
@@ -461,13 +554,13 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                     OutlinedTextField(
                         value = editFront,
                         onValueChange = { editFront = it },
-                        label = { Text("Front (Question)") },
+                        label = { Text("Front") },
                         modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
                         value = editBack,
                         onValueChange = { editBack = it },
-                        label = { Text("Back (Answer)") },
+                        label = { Text("Back") },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -475,14 +568,13 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
             confirmButton = {
                 Button(
                     onClick = {
-                        editingCard?.let { card ->
-                            viewModel.editFlashcard(card.copy(front = editFront.trim(), back = editBack.trim()))
+                        editingCard?.let { c ->
+                            viewModel.editFlashcard(c.copy(front = editFront.trim(), back = editBack.trim()))
                         }
                         editingCard = null
-                    },
-                    enabled = editFront.isNotBlank() && editBack.isNotBlank()
+                    }
                 ) {
-                    Text("Update Card")
+                    Text("Update")
                 }
             },
             dismissButton = {
@@ -545,12 +637,12 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
             onDismissRequest = { if (!isAiGenerating) showAiGeneratorDialog = false },
             title = { Text("Generate Flashcards with AI") },
             text = {
-                Column {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         text = "Enter a topic, chapter, or formula to automatically generate high-yield active recall flashcards:",
-                        style = MaterialTheme.typography.bodySmall
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
                     OutlinedTextField(
                         value = generatorTopic,
                         onValueChange = { generatorTopic = it },
@@ -559,8 +651,34 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp)
                     )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Card Count:", style = MaterialTheme.typography.bodySmall)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf(3, 5, 8).forEach { cnt ->
+                                FilterChip(
+                                    selected = generatorCount == cnt,
+                                    onClick = { generatorCount = cnt },
+                                    label = { Text("$cnt") }
+                                )
+                            }
+                        }
+                    }
+
+                    if (aiStatusMessage != null) {
+                        Text(
+                            text = aiStatusMessage!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = ForgeEmerald,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
                     if (isAiGenerating) {
-                        Spacer(modifier = Modifier.height(10.dp))
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     }
                 }
@@ -569,30 +687,32 @@ fun FlashcardsScreen(viewModel: StudyForgeViewModel) {
                 Button(
                     onClick = {
                         val topic = generatorTopic.trim()
-                        if (topic.isNotBlank()) {
+                        if (topic.isNotBlank() && !isAiGenerating) {
                             isAiGenerating = true
-                            coroutineScope.launch {
-                                val res = viewModel.aiManager.generateResponse(
-                                    botType = AiBotType.AI_FLASHCARD_GENERATOR,
-                                    userPrompt = "Generate 2 atomic Q&A flashcards for topic: $topic"
-                                )
-                                viewModel.repository.insertFlashcard(
-                                    FlashcardEntity(
-                                        deckId = selectedDeckId ?: 1L,
-                                        front = "What is the key principle of $topic?",
-                                        back = res.text.take(200),
-                                        cardType = "STANDARD"
-                                    )
-                                )
+                            aiStatusMessage = "Synthesizing flashcards with AI..."
+                            viewModel.generateFlashcardsWithAi(
+                                topic = topic,
+                                deckId = selectedDeckId ?: 1L,
+                                count = generatorCount
+                            ) { success, msg ->
                                 isAiGenerating = false
-                                showAiGeneratorDialog = false
-                                generatorTopic = ""
+                                aiStatusMessage = msg
+                                if (success) {
+                                    showAiGeneratorDialog = false
+                                    generatorTopic = ""
+                                }
                             }
                         }
                     },
                     enabled = !isAiGenerating && generatorTopic.isNotBlank()
                 ) {
-                    Text("Generate & Save")
+                    if (isAiGenerating) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Generating...")
+                    } else {
+                        Text("Generate & Save")
+                    }
                 }
             },
             dismissButton = {

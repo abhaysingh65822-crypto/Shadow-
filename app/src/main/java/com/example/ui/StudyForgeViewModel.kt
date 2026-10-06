@@ -847,6 +847,47 @@ class StudyForgeViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    fun deleteFlashcard(cardId: Long) {
+        viewModelScope.launch {
+            repository.deleteFlashcard(cardId)
+        }
+    }
+
+    fun createCustomFlashcard(deckId: Long, front: String, back: String, cardType: String = "STANDARD") {
+        viewModelScope.launch {
+            repository.insertFlashcard(
+                FlashcardEntity(
+                    deckId = deckId,
+                    front = front.trim(),
+                    back = back.trim(),
+                    cardType = cardType,
+                    repetitions = 0,
+                    intervalDays = 1,
+                    easeFactor = 2.5f,
+                    dueDate = System.currentTimeMillis()
+                )
+            )
+        }
+    }
+
+    fun generateFlashcardsWithAi(topic: String, deckId: Long, count: Int = 3, onDone: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val generated = aiManager.generateStructuredFlashcards(
+                    topic = topic.trim(),
+                    count = count,
+                    deckId = deckId
+                )
+                generated.forEach { card ->
+                    repository.insertFlashcard(card)
+                }
+                onDone(true, "Successfully generated and saved ${generated.size} active-recall flashcards!")
+            } catch (e: Exception) {
+                onDone(false, e.localizedMessage ?: "Failed to generate flashcards")
+            }
+        }
+    }
+
     // ==========================================
     // Notes Editing
     // ==========================================
@@ -891,48 +932,64 @@ class StudyForgeViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    fun addPlannerTask(
+        title: String,
+        subjectName: String,
+        durationMinutes: Int,
+        taskType: String = "STUDY",
+        priority: String = "HIGH",
+        daysOffset: Int = 0
+    ) {
+        viewModelScope.launch {
+            val scheduled = System.currentTimeMillis() + (daysOffset * 86400000L)
+            repository.insertPlannerTask(
+                PlannerTaskEntity(
+                    title = title.trim(),
+                    subjectName = subjectName.trim().ifBlank { "General" },
+                    chapterName = "Active Chapter",
+                    durationMinutes = durationMinutes.coerceIn(15, 240),
+                    taskType = taskType,
+                    priority = priority,
+                    scheduledDate = scheduled,
+                    isCompleted = false
+                )
+            )
+        }
+    }
+
+    fun toggleTaskCompleted(task: PlannerTaskEntity) {
+        viewModelScope.launch {
+            val updated = task.copy(isCompleted = !task.isCompleted)
+            repository.updatePlannerTask(updated)
+            if (updated.isCompleted) {
+                awardXp(15)
+            }
+        }
+    }
+
+    fun deletePlannerTask(taskId: Long) {
+        viewModelScope.launch {
+            repository.deletePlannerTask(taskId)
+        }
+    }
+
     fun generateAiStudyPlan(onDone: (Boolean, String) -> Unit) {
         viewModelScope.launch {
             try {
                 val userTarget = userProfile.value?.examTargetName?.ifBlank { "General STEM Studies" } ?: "General STEM Studies"
-                val allSubs = subjects.value
-                val weak = weakTopics.value
+                val allSubs = subjects.value.map { it.name }
+                val weak = weakTopics.value.map { it.title }
 
-                val planTasks = mutableListOf<PlannerTaskEntity>()
-                val baseTime = System.currentTimeMillis()
+                val generatedTasks = aiManager.generateStructuredStudyPlan(
+                    targetExam = userTarget,
+                    subjectsList = allSubs,
+                    weakTopicsList = weak
+                )
 
-                if (weak.isNotEmpty()) {
-                    weak.take(2).forEachIndexed { idx, top ->
-                        planTasks.add(
-                            PlannerTaskEntity(
-                                title = "Reinforce Weak Concept: ${top.title}",
-                                taskType = "REVISION",
-                                subjectName = allSubs.firstOrNull()?.name ?: "Physics",
-                                chapterName = "High-Yield Focus",
-                                scheduledDate = baseTime + (idx * 86400000L),
-                                durationMinutes = 40,
-                                priority = "HIGH"
-                            )
-                        )
-                    }
+                generatedTasks.forEach { task ->
+                    repository.insertPlannerTask(task)
                 }
-
-                allSubs.take(3).forEachIndexed { idx, sub ->
-                    planTasks.add(
-                        PlannerTaskEntity(
-                            title = "Practice & Concept Drill: ${sub.name}",
-                            taskType = "PRACTICE",
-                            subjectName = sub.name,
-                            chapterName = "Active Chapter",
-                            scheduledDate = baseTime + ((idx + 1) * 86400000L),
-                            durationMinutes = 45,
-                            priority = "MEDIUM"
-                        )
-                    )
-                }
-
-                planTasks.forEach { repository.insertPlannerTask(it) }
-                onDone(true, "AI scheduled ${planTasks.size} targeted study tasks aligned with $userTarget!")
+                onDone(true, "AI generated and added ${generatedTasks.size} structured study sessions for $userTarget!")
             } catch (e: Exception) {
                 onDone(false, e.localizedMessage ?: "Failed to generate study plan")
             }
@@ -983,6 +1040,28 @@ class StudyForgeViewModel(application: Application) : AndroidViewModel(applicati
             isRunning = false
         )
         pomodoroTimerJob?.cancel()
+    }
+
+    fun addPomodoroTime(minutes: Int) {
+        val addSec = minutes * 60
+        val current = _pomodoroState.value
+        val newTotal = current.totalSeconds + addSec
+        if (current.isRunning) {
+            val newRem = current.remainingSeconds + addSec
+            val newTarget = (current.targetEndTimeMillis ?: System.currentTimeMillis()) + (addSec * 1000L)
+            _pomodoroState.value = current.copy(
+                totalSeconds = newTotal,
+                remainingSeconds = newRem,
+                targetEndTimeMillis = newTarget
+            )
+        } else {
+            val newRem = current.remainingSeconds + addSec
+            _pomodoroState.value = current.copy(
+                totalSeconds = newTotal,
+                remainingSeconds = newRem,
+                pausedRemainingSeconds = newRem
+            )
+        }
     }
 
     fun importDataFromJson(jsonString: String, onDone: (Boolean, String) -> Unit) {

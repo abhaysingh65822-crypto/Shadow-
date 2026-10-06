@@ -1,5 +1,9 @@
 package com.example.ui.screens
 
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -31,12 +36,15 @@ import com.example.ui.theme.*
 
 @Composable
 fun DocumentReaderScreen(viewModel: StudyForgeViewModel) {
+    val context = LocalContext.current
     val documents by viewModel.documents.collectAsStateWithLifecycle()
     val selectedDoc by viewModel.selectedDocument.collectAsStateWithLifecycle()
     val bookmarks by viewModel.bookmarks.collectAsStateWithLifecycle()
 
     val currentDoc = selectedDoc ?: documents.firstOrNull()
     var showAddDialog by remember { mutableStateOf(false) }
+    var importStatusMessage by remember { mutableStateOf<String?>(null) }
+
     var newDocTitle by remember { mutableStateOf("") }
     var newDocSummary by remember { mutableStateOf("") }
     var newDocContent by remember { mutableStateOf("") }
@@ -44,6 +52,52 @@ fun DocumentReaderScreen(viewModel: StudyForgeViewModel) {
 
     var searchQuery by remember { mutableStateOf("") }
     var currentPage by remember(currentDoc?.id) { mutableIntStateOf(1) }
+
+    // File Picker Launcher for Android Device File Import
+    val filePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                var displayName = "Imported Document"
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val nameIdx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (nameIdx != -1 && cursor.moveToFirst()) {
+                        displayName = cursor.getString(nameIdx)
+                    }
+                }
+
+                // Read text stream safely if possible
+                var contentText = ""
+                try {
+                    context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { reader ->
+                        contentText = reader.readText()
+                    }
+                } catch (_: Exception) {
+                    contentText = ""
+                }
+
+                val ext = displayName.substringAfterLast('.', "PDF").uppercase()
+                val estimatedPages = (contentText.length / 1500).coerceAtLeast(1)
+                val summary = if (contentText.isNotBlank()) {
+                    contentText.take(200).replace("\n", " ") + "..."
+                } else {
+                    "Document imported from device ($displayName)."
+                }
+
+                viewModel.addDocument(
+                    title = displayName,
+                    summary = summary,
+                    content = if (contentText.isNotBlank()) contentText else "Full binary document contents for $displayName. Use AI specialist tools below to extract notes, flashcards, and exam questions.",
+                    pageCount = estimatedPages,
+                    fileType = ext
+                )
+                importStatusMessage = "Successfully imported '$displayName'!"
+            } catch (e: Exception) {
+                importStatusMessage = "Import failed: ${e.localizedMessage}"
+            }
+        }
+    }
 
     val isBookmarked = remember(bookmarks, currentDoc) {
         if (currentDoc == null) false
@@ -63,7 +117,7 @@ fun DocumentReaderScreen(viewModel: StudyForgeViewModel) {
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                border = androidx.compose.foundation.BorderStroke(1.dp, ForgeCyan.copy(alpha = 0.3f))
+                border = androidx.compose.foundation.BorderStroke(1.dp, ForgeCyan.copy(alpha = 0.35f))
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(
@@ -84,14 +138,44 @@ fun DocumentReaderScreen(viewModel: StudyForgeViewModel) {
                             )
                         }
 
-                        Button(
-                            onClick = { showAddDialog = true },
-                            shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(
+                                onClick = { filePickerLauncher.launch("*/*") },
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.UploadFile, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Import File", fontSize = 12.sp)
+                            }
+
+                            Button(
+                                onClick = { showAddDialog = true },
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = ForgeIndigo)
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("+ Add Text", fontSize = 12.sp)
+                            }
+                        }
+                    }
+
+                    if (importStatusMessage != null) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = ForgeEmerald.copy(alpha = 0.15f),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Import / Add", fontSize = 12.sp)
+                            Text(
+                                text = importStatusMessage ?: "",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = ForgeEmerald,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
                         }
                     }
 
@@ -134,7 +218,7 @@ fun DocumentReaderScreen(viewModel: StudyForgeViewModel) {
                     } else {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "No documents imported yet. Tap 'Import / Add' to store your syllabus chapters or reading material.",
+                            text = "No documents imported yet. Tap 'Import File' to load PDFs/notes from device or '+ Add Text'.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -198,7 +282,7 @@ fun DocumentReaderScreen(viewModel: StudyForgeViewModel) {
                                     Icon(
                                         imageVector = Icons.Default.DeleteOutline,
                                         contentDescription = "Delete Document",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        tint = ForgeRose
                                     )
                                 }
                             }
@@ -218,87 +302,91 @@ fun DocumentReaderScreen(viewModel: StudyForgeViewModel) {
                             color = MaterialTheme.colorScheme.surfaceVariant
                         ) {
                             Text(
-                                text = "Summary: ${currentDoc.summary}",
+                                text = "Overview: ${currentDoc.summary}",
                                 style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(10.dp),
-                                lineHeight = 18.sp
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(10.dp)
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
 
-                        // In-Document Search Bar
+                        // Search within document
                         OutlinedTextField(
                             value = searchQuery,
                             onValueChange = { searchQuery = it },
-                            placeholder = { Text("Search text within document...") },
-                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            placeholder = { Text("Search inside document text...", fontSize = 12.sp) },
+                            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp)) },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(10.dp),
-                            singleLine = true
+                            shape = RoundedCornerShape(10.dp)
                         )
 
                         Spacer(modifier = Modifier.height(14.dp))
-                        Text(
-                            text = "Content Excerpt & High-Yield Sections",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
 
-                        val displayContent = if (searchQuery.isNotBlank()) {
-                            val lines = currentDoc.contentExtract.lines().filter { it.contains(searchQuery, ignoreCase = true) }
-                            if (lines.isNotEmpty()) lines.joinToString("\n\n") else "No matching occurrences found for \"$searchQuery\"."
-                        } else {
-                            currentDoc.contentExtract
+                        // Text content viewport
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 160.dp, max = 320.dp)
+                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(10.dp)),
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surface
+                        ) {
+                            val textToShow = if (searchQuery.isNotBlank()) {
+                                currentDoc.contentExtract.lines().filter { it.contains(searchQuery, ignoreCase = true) }.joinToString("\n")
+                            } else {
+                                currentDoc.contentExtract
+                            }
+
+                            Text(
+                                text = if (textToShow.isNotBlank()) textToShow else "No text match found.",
+                                style = MaterialTheme.typography.bodySmall,
+                                lineHeight = 20.sp,
+                                modifier = Modifier.padding(14.dp)
+                            )
                         }
 
-                        Text(
-                            text = displayContent,
-                            style = MaterialTheme.typography.bodyMedium,
-                            lineHeight = 22.sp
-                        )
+                        Spacer(modifier = Modifier.height(14.dp))
 
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Page Navigation Controls
+                        // Page Stepper
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            OutlinedButton(
+                            IconButton(
                                 onClick = { if (currentPage > 1) currentPage-- },
-                                enabled = currentPage > 1,
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                enabled = currentPage > 1
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.NavigateBefore, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Text("Prev Page", fontSize = 11.sp)
+                                Icon(Icons.AutoMirrored.Filled.NavigateBefore, contentDescription = "Previous Page")
                             }
 
                             Text(
                                 text = "Page $currentPage / ${currentDoc.pageCount.coerceAtLeast(1)}",
                                 style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.Bold
                             )
 
-                            OutlinedButton(
+                            IconButton(
                                 onClick = { if (currentPage < currentDoc.pageCount) currentPage++ },
-                                enabled = currentPage < currentDoc.pageCount,
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                                enabled = currentPage < currentDoc.pageCount
                             ) {
-                                Text("Next Page", fontSize = 11.sp)
-                                Icon(Icons.AutoMirrored.Filled.NavigateNext, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Icon(Icons.AutoMirrored.Filled.NavigateNext, contentDescription = "Next Page")
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // AI Document Query Bar
+                        // AI Tools for Current Document
+                        Text(
+                            text = "AI Document Engines",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -306,22 +394,23 @@ fun DocumentReaderScreen(viewModel: StudyForgeViewModel) {
                             Button(
                                 onClick = {
                                     viewModel.selectedBot.value = AiBotType.AI_TUTOR
-                                    viewModel.aiChatInput.value = "From document '${currentDoc.title}', explain the core laws:\n\n${currentDoc.contentExtract}"
+                                    viewModel.aiChatInput.value = "Analyze and summarize this study material:\n\n${currentDoc.title}\n${currentDoc.contentExtract.take(800)}"
                                     viewModel.navigateTo(StudyForgeRoute.AiBots)
                                 },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = ForgeIndigo)
                             ) {
                                 Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Ask AI on Doc", fontSize = 12.sp)
+                                Text("Summarize", fontSize = 12.sp)
                             }
 
                             OutlinedButton(
                                 onClick = {
                                     viewModel.selectedBot.value = AiBotType.AI_FLASHCARD_GENERATOR
-                                    viewModel.aiChatInput.value = "Create high-yield flashcards from this text:\n\n${currentDoc.contentExtract}"
+                                    viewModel.aiChatInput.value = "Create high-yield active recall flashcards from this text:\n\n${currentDoc.contentExtract.take(800)}"
                                     viewModel.navigateTo(StudyForgeRoute.AiBots)
                                 },
                                 modifier = Modifier.weight(1f),
@@ -331,6 +420,21 @@ fun DocumentReaderScreen(viewModel: StudyForgeViewModel) {
                                 Icon(Icons.Default.Style, contentDescription = null, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text("Make Cards", fontSize = 12.sp)
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    viewModel.selectedBot.value = AiBotType.AI_QUESTION_GENERATOR
+                                    viewModel.aiChatInput.value = "Generate practice questions with solutions based on this excerpt:\n\n${currentDoc.contentExtract.take(800)}"
+                                    viewModel.navigateTo(StudyForgeRoute.AiBots)
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.Quiz, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Make Test", fontSize = 12.sp)
                             }
                         }
                     }
@@ -342,7 +446,7 @@ fun DocumentReaderScreen(viewModel: StudyForgeViewModel) {
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
-            title = { Text("Import / Add Study Document") },
+            title = { Text("Add Study Material") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(
