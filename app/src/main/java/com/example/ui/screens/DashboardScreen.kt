@@ -18,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -49,187 +50,259 @@ fun DashboardScreen(viewModel: StudyForgeViewModel) {
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Top Hero Header: Level, Streak, XP, Exam Countdown
+        // Futuristic Cyber Hero: Command Center HUD
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(22.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    containerColor = MaterialTheme.colorScheme.surface
                 ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    Brush.linearGradient(
+                        colors = listOf(ForgeIndigo.copy(alpha = 0.5f), ForgeCyan.copy(alpha = 0.2f), Color.Transparent)
+                    )
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
             ) {
-                Column(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(18.dp)
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    ForgeIndigo.copy(alpha = 0.08f),
+                                    Color.Transparent
+                                )
+                            )
+                        )
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "STUDYFORGE OS",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = ForgeIndigoLight,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.5.sp
-                            )
-                            Text(
-                                text = "Personal Command Center",
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.ExtraBold
-                            )
-                        }
-
-                        // Streak Badge
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = ForgeAmber.copy(alpha = 0.15f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, ForgeAmber.copy(alpha = 0.5f))
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.LocalFireDepartment,
-                                    contentDescription = "Streak",
-                                    tint = ForgeAmber,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = "${profile?.currentStreak ?: 0} Day Streak",
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp,
-                                    color = ForgeAmber
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // XP and Level Bar
-                    val currentXp = profile?.totalXp ?: 0
-                    val currentLevel = profile?.level ?: 1
-                    val xpInLevel = currentXp % 300
-                    val progressFloat = (xpInLevel / 300f).coerceIn(0f, 1f)
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Level $currentLevel Scholar",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = "$currentXp XP Total (${xpInLevel}/300 to Lvl ${currentLevel + 1})",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    LinearProgressIndicator(
-                        progress = { progressFloat },
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(8.dp)
-                            .clip(RoundedCornerShape(4.dp)),
-                        color = ForgeIndigoLight,
-                        trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Target Exam Countdown Pill
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { viewModel.navigateTo(StudyForgeRoute.Profile) },
-                        shape = RoundedCornerShape(12.dp),
-                        color = ForgeCyan.copy(alpha = 0.12f)
+                            .padding(20.dp)
                     ) {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(ForgeEmerald)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "STUDY OS ACTIVE",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = ForgeEmerald,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        letterSpacing = 1.6.sp
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Academic Command Center",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 20.sp
+                                )
+                            }
+
+                            // Glowing Streak Pill
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = ForgeAmber.copy(alpha = 0.16f),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, ForgeAmber.copy(alpha = 0.6f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.LocalFireDepartment,
+                                        contentDescription = "Streak",
+                                        tint = ForgeAmber,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "${profile?.currentStreak ?: 0}d Streak",
+                                        fontWeight = FontWeight.ExtraBold,
+                                        fontSize = 12.sp,
+                                        color = ForgeAmber
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // XP, Level & Progression Gauge
+                        val currentXp = profile?.totalXp ?: 0
+                        val currentLevel = profile?.level ?: 1
+                        val xpInLevel = currentXp % 300
+                        val progressFloat = (xpInLevel / 300f).coerceIn(0f, 1f)
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.Flag,
-                                    contentDescription = null,
-                                    tint = ForgeCyan,
-                                    modifier = Modifier.size(18.dp)
-                                )
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = ForgeIndigo.copy(alpha = 0.2f)
+                                ) {
+                                    Text(
+                                        text = "LVL $currentLevel",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = ForgeIndigoLight,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = if (!profile?.examTargetName.isNullOrBlank()) profile!!.examTargetName else "Set Target Exam",
+                                    text = "Scholar Mastery",
                                     style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
                             Text(
-                                text = if (profile?.examDateMillis != null && profile!!.examDateMillis!! > System.currentTimeMillis()) {
-                                    val days = ((profile!!.examDateMillis!! - System.currentTimeMillis()) / (1000L * 60 * 60 * 24)).toInt()
-                                    "$days Days Left"
-                                } else if (!profile?.examTargetName.isNullOrBlank()) {
-                                    "Date Not Set"
-                                } else {
-                                    "Tap to Set"
-                                },
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = ForgeCyan
+                                text = "$currentXp XP Total (${xpInLevel}/300 to Next)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontWeight = FontWeight.Medium
                             )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        LinearProgressIndicator(
+                            progress = { progressFloat },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp)),
+                            color = ForgeIndigoLight,
+                            trackColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+                        )
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Exam Countdown Pill with Cyber Glow
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { viewModel.navigateTo(StudyForgeRoute.Profile) },
+                            shape = RoundedCornerShape(12.dp),
+                            color = ForgeCyan.copy(alpha = 0.12f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, ForgeCyan.copy(alpha = 0.35f))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 11.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Flag,
+                                        contentDescription = null,
+                                        tint = ForgeCyanLight,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = if (!profile?.examTargetName.isNullOrBlank()) profile!!.examTargetName else "Set Target Exam",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                                Text(
+                                    text = if (profile?.examDateMillis != null && profile!!.examDateMillis!! > System.currentTimeMillis()) {
+                                        val days = ((profile!!.examDateMillis!! - System.currentTimeMillis()) / (1000L * 60 * 60 * 24)).toInt()
+                                        "$days Days Left"
+                                    } else if (!profile?.examTargetName.isNullOrBlank()) {
+                                        "Date Not Set"
+                                    } else {
+                                        "Tap to Set"
+                                    },
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = ForgeCyanLight
+                                )
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Daily AI Briefing & Adaptive Recommendation
+        // Daily AI Intelligence Briefing
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = ForgeIndigo.copy(alpha = 0.08f)
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
                 ),
-                border = androidx.compose.foundation.BorderStroke(1.dp, ForgeIndigoLight.copy(alpha = 0.3f))
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    ForgeIndigoLight.copy(alpha = 0.35f)
+                )
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            shape = CircleShape,
-                            color = ForgeIndigoLight,
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        Brush.linearGradient(listOf(ForgeIndigo, ForgeViolet))
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Icon(
                                     imageVector = Icons.Default.AutoAwesome,
                                     contentDescription = "AI",
                                     tint = Color.White,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(16.dp)
                                 )
                             }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "Daily AI Study Intelligence",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Daily AI Study Intelligence",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
+
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = ForgeIndigo.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = "ADAPTIVE",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = ForgeIndigoLight,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(10.dp))
@@ -249,24 +322,25 @@ fun DashboardScreen(viewModel: StudyForgeViewModel) {
                     Text(
                         text = recText,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f),
-                        lineHeight = 20.sp
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.9f),
+                        lineHeight = 21.sp
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Button(
                             onClick = { viewModel.navigateTo(StudyForgeRoute.Pomodoro) },
                             modifier = Modifier
                                 .weight(1f)
                                 .testTag("quick_focus_button"),
                             shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                            colors = ButtonDefaults.buttonColors(containerColor = ForgeIndigo),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                         ) {
                             Icon(Icons.Default.Timer, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Start Focus", fontSize = 13.sp)
+                            Text("Start Focus", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
 
                         OutlinedButton(
@@ -275,11 +349,11 @@ fun DashboardScreen(viewModel: StudyForgeViewModel) {
                                 .weight(1f)
                                 .testTag("quick_practice_button"),
                             shape = RoundedCornerShape(10.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                         ) {
                             Icon(Icons.Default.Psychology, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Practice Weak", fontSize = 13.sp)
+                            Text("Practice Weak", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -312,7 +386,7 @@ fun DashboardScreen(viewModel: StudyForgeViewModel) {
                 ModuleTile(
                     modifier = Modifier.weight(1f),
                     title = "Syllabus",
-                    subtitle = "${subjects.size} Subjects",
+                    subtitle = "${subjects.size} Subs",
                     icon = Icons.AutoMirrored.Filled.MenuBook,
                     accentColor = ForgeIndigoLight,
                     testTag = "tile_syllabus",
@@ -512,9 +586,11 @@ fun ModuleTile(
     Card(
         modifier = modifier
             .testTag(testTag)
+            .clip(RoundedCornerShape(14.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        border = androidx.compose.foundation.BorderStroke(1.dp, accentColor.copy(alpha = 0.25f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(
@@ -523,23 +599,33 @@ fun ModuleTile(
                 .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = title,
-                tint = accentColor,
-                modifier = Modifier.size(24.dp)
-            )
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = accentColor.copy(alpha = 0.15f),
+                modifier = Modifier.size(34.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = title,
+                        tint = accentColor,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = title,
                 style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                maxLines = 1
             )
             Text(
                 text = subtitle,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 11.sp
+                fontSize = 10.sp,
+                maxLines = 1
             )
         }
     }

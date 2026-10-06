@@ -20,8 +20,8 @@ private val DarkColorScheme = darkColorScheme(
     onSecondary = Color(0xFF0F172A),
     secondaryContainer = Color(0xFF164E63),
     onSecondaryContainer = Color(0xFFCFFAFE),
-    tertiary = ForgeAmber,
-    onTertiary = Color(0xFF451A03),
+    tertiary = ForgeViolet,
+    onTertiary = Color.White,
     background = DarkBg,
     onBackground = DarkTextPrimary,
     surface = DarkSurface,
@@ -29,6 +29,7 @@ private val DarkColorScheme = darkColorScheme(
     surfaceVariant = DarkSurfaceVariant,
     onSurfaceVariant = DarkTextSecondary,
     outline = DarkBorder,
+    outlineVariant = DarkBorderSubtle,
     error = ForgeRose,
     onError = Color.White
 )
@@ -36,13 +37,13 @@ private val DarkColorScheme = darkColorScheme(
 private val LightColorScheme = lightColorScheme(
     primary = ForgeIndigo,
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFE0E7FF),
+    primaryContainer = Color(0xFFEEF2FF),
     onPrimaryContainer = ForgeIndigoDark,
     secondary = ForgeCyan,
     onSecondary = Color.White,
-    secondaryContainer = Color(0xFFCFFAFE),
+    secondaryContainer = Color(0xFFECFEFF),
     onSecondaryContainer = Color(0xFF164E63),
-    tertiary = ForgeAmber,
+    tertiary = ForgeViolet,
     onTertiary = Color.White,
     background = LightBg,
     onBackground = LightTextPrimary,
@@ -58,7 +59,7 @@ private val LightColorScheme = lightColorScheme(
 @Composable
 fun MyApplicationTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = false, // Use our handcrafted rich palette by default
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val colorScheme = when {
@@ -70,6 +71,9 @@ fun MyApplicationTheme(
         else -> LightColorScheme
     }
 
-    MaterialTheme(colorScheme = colorScheme, typography = Typography, content = content)
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = Typography,
+        content = content
+    )
 }
-

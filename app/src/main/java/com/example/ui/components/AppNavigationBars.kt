@@ -1,7 +1,14 @@
 package com.example.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -11,11 +18,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -48,148 +58,219 @@ fun StudyForgeTopBar(
     val notifications by viewModel.notifications.collectAsStateWithLifecycle()
     val unreadCount = remember(notifications) { notifications.count { !it.isRead } }
 
-    TopAppBar(
-        title = {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding(),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
+        shadowElevation = 4.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Brand OS Pill & Active Context
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .weight(1f, fill = false)
+                    .clip(RoundedCornerShape(12.dp))
                     .clickable { viewModel.navigateTo(StudyForgeRoute.Profile) }
+                    .padding(end = 8.dp)
             ) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = ForgeIndigo,
-                    modifier = Modifier.size(30.dp)
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(ForgeIndigo, ForgeViolet, ForgeCyan)
+                            )
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.AutoAwesome,
-                            contentDescription = "Logo",
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Column(modifier = Modifier.weight(1f, fill = false)) {
-                    Text(
-                        text = "StudyForge",
-                        fontWeight = FontWeight.Black,
-                        fontSize = 16.sp,
-                        letterSpacing = 0.3.sp,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Ellipsis
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesome,
+                        contentDescription = "Logo",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
                     )
+                }
+
+                Spacer(modifier = Modifier.width(9.dp))
+
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "STUDYFORGE",
+                            fontWeight = FontWeight.Black,
+                            fontSize = 14.sp,
+                            letterSpacing = 1.1.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = ForgeCyan.copy(alpha = 0.15f)
+                        ) {
+                            Text(
+                                text = "OS",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = ForgeCyan,
+                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+
                     Text(
                         text = currentRoute.title,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 10.sp,
+                        color = ForgeIndigoLight,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         softWrap = false,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
             }
-        },
-        actions = {
-            // Combined Streak & Level Compact Badge
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = ForgeAmber.copy(alpha = 0.12f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, ForgeAmber.copy(alpha = 0.35f)),
-                modifier = Modifier
-                    .clickable { viewModel.navigateTo(StudyForgeRoute.Profile) }
-                    .padding(end = 2.dp)
+
+            // Quick Status & Action HUD
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // Streak & Level OS Chip
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, ForgeAmber.copy(alpha = 0.4f)),
+                    modifier = Modifier.clickable { viewModel.navigateTo(StudyForgeRoute.Profile) }
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.LocalFireDepartment,
-                        contentDescription = "Streak",
-                        tint = ForgeAmber,
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.width(2.dp))
-                    Text(
-                        text = "${profile?.currentStreak ?: 0}",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp,
-                        color = ForgeAmber
-                    )
-                    Text(
-                        text = " • ",
-                        fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
-                    Text(
-                        text = "L${profile?.level ?: 1}",
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 11.sp,
-                        color = ForgeIndigoLight
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.LocalFireDepartment,
+                            contentDescription = "Streak",
+                            tint = ForgeAmber,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = "${profile?.currentStreak ?: 0}d",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = ForgeAmber
+                        )
+                        Text(
+                            text = " • ",
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                        Text(
+                            text = "Lv${profile?.level ?: 1}",
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 11.sp,
+                            color = ForgeIndigoLight
+                        )
+                    }
                 }
-            }
 
-            // Global Search Trigger
-            IconButton(
-                onClick = onOpenSearch,
-                modifier = Modifier
-                    .size(36.dp)
-                    .testTag("open_search_btn")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Search,
-                    contentDescription = "Search",
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+                // Global Search
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    IconButton(
+                        onClick = onOpenSearch,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("open_search_btn")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            modifier = Modifier.size(18.dp),
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
 
-            // Notification Bell with Badge
-            IconButton(
-                onClick = { viewModel.navigateTo(StudyForgeRoute.Notifications) },
-                modifier = Modifier
-                    .size(36.dp)
-                    .testTag("open_notifications_btn")
-            ) {
-                BadgedBox(
-                    badge = {
-                        if (unreadCount > 0) {
-                            Badge { Text("$unreadCount", fontSize = 9.sp) }
+                // Notifications with live badge
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    IconButton(
+                        onClick = { viewModel.navigateTo(StudyForgeRoute.Notifications) },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .testTag("open_notifications_btn")
+                    ) {
+                        BadgedBox(
+                            badge = {
+                                if (unreadCount > 0) {
+                                    Badge(
+                                        containerColor = ForgeRose,
+                                        contentColor = Color.White
+                                    ) {
+                                        Text(text = if (unreadCount > 9) "9+" else "$unreadCount", fontSize = 9.sp)
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = if (unreadCount > 0) Icons.Default.NotificationsActive else Icons.Default.NotificationsNone,
+                                contentDescription = "Notifications",
+                                tint = if (unreadCount > 0) ForgeAmber else MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
+                }
+
+                // AI Copilot Quick Floating Capsule
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = ForgeIndigo,
+                    modifier = Modifier
+                        .height(34.dp)
+                        .clickable { viewModel.showCopilotDialog.value = true }
+                        .testTag("open_copilot_btn")
                 ) {
-                    Icon(
-                        imageVector = if (unreadCount > 0) Icons.Default.NotificationsActive else Icons.Default.NotificationsNone,
-                        contentDescription = "Notifications",
-                        tint = if (unreadCount > 0) ForgeAmber else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = "AI Copilot",
+                            tint = Color.White,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "AI",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = Color.White
+                        )
+                    }
                 }
             }
-
-            // AI Copilot trigger
-            IconButton(
-                onClick = { viewModel.showCopilotDialog.value = true },
-                modifier = Modifier
-                    .size(36.dp)
-                    .testTag("open_copilot_btn")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.AutoAwesome,
-                    contentDescription = "AI Copilot",
-                    tint = ForgeIndigoLight,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        )
-    )
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -275,125 +356,159 @@ fun StudyForgeBottomBar(viewModel: StudyForgeViewModel) {
         )
     }
 
-    NavigationBar(
-        containerColor = MaterialTheme.colorScheme.surface,
-        tonalElevation = 6.dp
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding(),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 8.dp
     ) {
-        NavigationBarItem(
-            selected = currentRoute == StudyForgeRoute.Dashboard,
-            onClick = { viewModel.navigateTo(StudyForgeRoute.Dashboard) },
-            icon = { Icon(Icons.Default.Dashboard, contentDescription = "Dashboard") },
-            label = {
-                Text(
-                    text = "Home",
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis
+        NavigationBar(
+            containerColor = Color.Transparent,
+            tonalElevation = 0.dp
+        ) {
+            NavigationBarItem(
+                selected = currentRoute == StudyForgeRoute.Dashboard,
+                onClick = { viewModel.navigateTo(StudyForgeRoute.Dashboard) },
+                icon = { Icon(Icons.Default.Dashboard, contentDescription = "Dashboard") },
+                label = {
+                    Text(
+                        text = "Home",
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                alwaysShowLabel = true,
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = ForgeIndigoLight,
+                    indicatorColor = ForgeIndigo.copy(alpha = 0.18f)
                 )
-            },
-            alwaysShowLabel = true
-        )
+            )
 
-        NavigationBarItem(
-            selected = currentRoute == StudyForgeRoute.Syllabus,
-            onClick = { viewModel.navigateTo(StudyForgeRoute.Syllabus) },
-            icon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = "Syllabus") },
-            label = {
-                Text(
-                    text = "Syllabus",
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis
+            NavigationBarItem(
+                selected = currentRoute == StudyForgeRoute.Syllabus,
+                onClick = { viewModel.navigateTo(StudyForgeRoute.Syllabus) },
+                icon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = "Syllabus") },
+                label = {
+                    Text(
+                        text = "Syllabus",
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                alwaysShowLabel = true,
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = ForgeIndigoLight,
+                    indicatorColor = ForgeIndigo.copy(alpha = 0.18f)
                 )
-            },
-            alwaysShowLabel = true
-        )
+            )
 
-        NavigationBarItem(
-            selected = currentRoute == StudyForgeRoute.QuestionBank || currentRoute == StudyForgeRoute.TestEngine || currentRoute == StudyForgeRoute.ActiveTest,
-            onClick = { viewModel.navigateTo(StudyForgeRoute.QuestionBank) },
-            icon = { Icon(Icons.Default.Quiz, contentDescription = "Practice") },
-            label = {
-                Text(
-                    text = "Practice",
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis
+            NavigationBarItem(
+                selected = currentRoute in listOf(StudyForgeRoute.QuestionBank, StudyForgeRoute.TestEngine, StudyForgeRoute.ActiveTest),
+                onClick = { viewModel.navigateTo(StudyForgeRoute.QuestionBank) },
+                icon = { Icon(Icons.Default.Quiz, contentDescription = "Practice") },
+                label = {
+                    Text(
+                        text = "Practice",
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                alwaysShowLabel = true,
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = ForgeIndigoLight,
+                    indicatorColor = ForgeIndigo.copy(alpha = 0.18f)
                 )
-            },
-            alwaysShowLabel = true
-        )
+            )
 
-        NavigationBarItem(
-            selected = currentRoute == StudyForgeRoute.Pomodoro,
-            onClick = { viewModel.navigateTo(StudyForgeRoute.Pomodoro) },
-            icon = { Icon(Icons.Default.Timer, contentDescription = "Focus") },
-            label = {
-                Text(
-                    text = "Focus",
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis
+            NavigationBarItem(
+                selected = currentRoute == StudyForgeRoute.Pomodoro,
+                onClick = { viewModel.navigateTo(StudyForgeRoute.Pomodoro) },
+                icon = { Icon(Icons.Default.Timer, contentDescription = "Focus") },
+                label = {
+                    Text(
+                        text = "Focus",
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                alwaysShowLabel = true,
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = ForgeIndigoLight,
+                    indicatorColor = ForgeIndigo.copy(alpha = 0.18f)
                 )
-            },
-            alwaysShowLabel = true
-        )
+            )
 
-        NavigationBarItem(
-            selected = currentRoute == StudyForgeRoute.AiBots,
-            onClick = { viewModel.navigateTo(StudyForgeRoute.AiBots) },
-            icon = { Icon(Icons.Default.AutoAwesome, contentDescription = "AI") },
-            label = {
-                Text(
-                    text = "AI Bots",
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis
+            NavigationBarItem(
+                selected = currentRoute == StudyForgeRoute.AiBots,
+                onClick = { viewModel.navigateTo(StudyForgeRoute.AiBots) },
+                icon = { Icon(Icons.Default.Psychology, contentDescription = "AI Bots") },
+                label = {
+                    Text(
+                        text = "AI Bots",
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                alwaysShowLabel = true,
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = ForgeIndigoLight,
+                    indicatorColor = ForgeIndigo.copy(alpha = 0.18f)
                 )
-            },
-            alwaysShowLabel = true
-        )
+            )
 
-        NavigationBarItem(
-            selected = showMoreSheet || currentRoute in listOf(
-                StudyForgeRoute.Notes, StudyForgeRoute.DocumentReader, StudyForgeRoute.Flashcards,
-                StudyForgeRoute.Planner, StudyForgeRoute.MistakeBook, StudyForgeRoute.Analytics,
-                StudyForgeRoute.Bookmarks, StudyForgeRoute.Profile, StudyForgeRoute.Settings
-            ),
-            onClick = { showMoreSheet = true },
-            icon = { Icon(Icons.Default.MoreHoriz, contentDescription = "More") },
-            label = {
-                Text(
-                    text = "More",
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis
+            NavigationBarItem(
+                selected = showMoreSheet,
+                onClick = { showMoreSheet = true },
+                icon = { Icon(Icons.Default.Apps, contentDescription = "More Tools") },
+                label = {
+                    Text(
+                        text = "More",
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                alwaysShowLabel = true,
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = ForgeIndigoLight,
+                    indicatorColor = ForgeIndigo.copy(alpha = 0.18f)
                 )
-            },
-            alwaysShowLabel = true,
-            modifier = Modifier.testTag("nav_more_btn")
-        )
+            )
+        }
     }
 
-    // Modern ModalBottomSheet for More Menu (responsive, accessible, safe-insets)
     if (showMoreSheet) {
         ModalBottomSheet(
             onDismissRequest = { showMoreSheet = false },
             containerColor = MaterialTheme.colorScheme.surface,
             scrimColor = Color.Black.copy(alpha = 0.5f),
-            dragHandle = { BottomSheetDefaults.DragHandle() }
+            dragHandle = {
+                Surface(
+                    modifier = Modifier.padding(top = 10.dp, bottom = 6.dp),
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                    shape = CircleShape
+                ) {
+                    Box(modifier = Modifier.size(width = 36.dp, height = 4.dp))
+                }
+            }
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .padding(bottom = 24.dp)
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
+                    .navigationBarsPadding()
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -402,92 +517,93 @@ fun StudyForgeBottomBar(viewModel: StudyForgeViewModel) {
                 ) {
                     Column {
                         Text(
-                            text = "StudyForge Ecosystem",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.ExtraBold
+                            text = "STUDY TOOLS & MODULES",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = ForgeIndigoLight,
+                            letterSpacing = 1.2.sp
                         )
                         Text(
-                            text = "Select any specialized study module",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = "StudyForge Operating System",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.ExtraBold
                         )
                     }
-                    IconButton(
-                        onClick = { showMoreSheet = false },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(Icons.Default.Close, contentDescription = "Close sheet", modifier = Modifier.size(18.dp))
+
+                    IconButton(onClick = { showMoreSheet = false }) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
                     }
                 }
 
                 Spacer(modifier = Modifier.height(14.dp))
 
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(3),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    columns = GridCells.Fixed(2),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     items(moreItems) { item ->
-                        val isCurrent = currentRoute == item.route
-                        Card(
+                        Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(94.dp)
-                                .testTag(item.testTag)
+                                .clip(RoundedCornerShape(14.dp))
                                 .clickable {
                                     showMoreSheet = false
                                     viewModel.navigateTo(item.route)
-                                },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (isCurrent) ForgeIndigo.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant
-                            ),
-                            border = if (isCurrent) androidx.compose.foundation.BorderStroke(1.5.dp, ForgeIndigoLight) else null
+                                }
+                                .testTag(item.testTag),
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            border = androidx.compose.foundation.BorderStroke(
+                                1.dp,
+                                item.accentColor.copy(alpha = 0.35f)
+                            )
                         ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .padding(8.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Surface(
-                                    shape = CircleShape,
-                                    color = item.accentColor.copy(alpha = 0.15f),
-                                    modifier = Modifier.size(32.dp)
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = item.accentColor.copy(alpha = 0.16f),
+                                    modifier = Modifier.size(38.dp)
                                 ) {
                                     Box(contentAlignment = Alignment.Center) {
                                         Icon(
                                             imageVector = item.icon,
                                             contentDescription = item.title,
                                             tint = item.accentColor,
-                                            modifier = Modifier.size(18.dp)
+                                            modifier = Modifier.size(20.dp)
                                         )
                                     }
                                 }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = item.title,
-                                    fontSize = 11.sp,
-                                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.SemiBold,
-                                    color = if (isCurrent) ForgeIndigoLight else MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    softWrap = false,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = item.subtitle,
-                                    fontSize = 8.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    softWrap = false,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+
+                                Spacer(modifier = Modifier.width(10.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = item.title,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = item.subtitle,
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(20.dp))
             }
         }
     }
